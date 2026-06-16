@@ -37,9 +37,39 @@
   <!-- Tab: Upload -->
   <div class="tab-panel active" data-tab="upload">
 
-    <!-- Upload -->
+    <!-- Buscar via API -->
+    <section class="card api-panel" id="apiPanel">
+      <h2 class="section-title">1. Buscar via API <span class="hint">(Meta + Zoho direto)</span></h2>
+      <div class="api-status" id="apiStatus"></div>
+      <div class="api-filters">
+        <div class="filter-field">
+          <label for="apiDatePreset">Período predefinido</label>
+          <select id="apiDatePreset">
+            <option value="last_7d">Últimos 7 dias</option>
+            <option value="last_14d">Últimos 14 dias</option>
+            <option value="last_30d" selected>Últimos 30 dias</option>
+            <option value="last_90d">Últimos 90 dias</option>
+            <option value="this_month">Este mês</option>
+            <option value="last_month">Mês passado</option>
+            <option value="custom">Período personalizado</option>
+          </select>
+        </div>
+        <div class="filter-field" id="apiCustomDates" style="display:none; gap:8px; display:none">
+          <label>Data início</label>
+          <input type="date" id="apiSince" />
+          <label>Data fim</label>
+          <input type="date" id="apiUntil" />
+        </div>
+      </div>
+      <div class="api-actions">
+        <button id="fetchApiBtn" class="btn btn--primary">Buscar via API</button>
+        <span id="apiLoadingStatus" class="process-status"></span>
+      </div>
+    </section>
+
+    <!-- Upload Manual -->
     <section class="card upload-panel">
-      <h2 class="section-title">1. Upload das planilhas</h2>
+      <h2 class="section-title">2. Upload manual <span class="hint">(fallback)</span></h2>
       <div class="upload-grid">
         <div class="upload-field">
           <label for="metaFile">Planilha Meta Ads <span class="hint">(.xlsx, .xls, .csv)</span></label>
@@ -53,7 +83,7 @@
         </div>
       </div>
       <div class="upload-footer">
-        <button id="updateDashboardBtn" class="btn btn--primary" disabled>Atualizar Dashboard</button>
+        <button id="updateDashboardBtn" class="btn btn--secondary" disabled>Atualizar Dashboard</button>
         <span id="processStatus" class="process-status"></span>
       </div>
     </section>

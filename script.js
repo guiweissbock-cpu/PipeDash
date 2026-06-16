@@ -1018,6 +1018,175 @@ document.getElementById("sendReportBtn").addEventListener("click", async () => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// INTEGRAÇÃO COM API LOCAL (servidor Express em localhost:3000)
+// ---------------------------------------------------------------------------
+
+// Converte resposta do /api/meta/insights para o formato interno do pipeline
+function metaApiToRows(apiRows) {
+  return apiRows.map((r) => ({
+    campanha:    cleanDisplay(r.campaign_name) || "(sem campanha)",
+    conjunto:    cleanDisplay(r.adset_name)    || "(sem conjunto)",
+    anuncio:     cleanDisplay(r.ad_name)       || "",
+    anuncioKey:  normalizeKey(r.ad_name),
+    impressoes:  Number(r.impressions)  || 0,
+    frequencia:  0,
+    valorGasto:  Number(r.spend)        || 0,
+    cliques:     Number(r.clicks)       || 0,
+    leads:       Number(r.leads)        || 0,
+    dataInicio:  r.date_start ? new Date(r.date_start) : null,
+    dataFim:     r.date_stop  ? new Date(r.date_stop)  : null,
+    adId:        normalizeKey(r.ad_id),
+  })).filter((r) => r.anuncio);
+}
+
+// Converte resposta do /api/zoho/deals para o formato interno do pipeline
+function zohoApiToRows(apiRows) {
+  return apiRows.map((r) => {
+    const stage = cleanDisplay(r.stage) || "";
+    return {
+      nomeNegocio:         cleanDisplay(r.dealName),
+      nomeContato:         cleanDisplay(r.contactName),
+      origem:              cleanDisplay(r.leadSource),
+      metaAdsId:           normalizeKey(r.metaAdId),
+      metaAdsAnuncio:      cleanDisplay(r.metaAdName),
+      metaAdsAnuncioKey:   normalizeKey(r.metaAdName),
+      metaAdsCampanha:     cleanDisplay(r.metaCampaign),
+      metaAdsLeadId:       cleanDisplay(r.metaLeadId),
+      metaAdsCampanhaId:   cleanDisplay(r.metaCampaignId),
+      icp:                 cleanDisplay(r.icp),
+      stage,
+      stageKey:            normalizeKey(stage),
+      horaCriacao:         r.createdTime ? new Date(r.createdTime) : null,
+    };
+  }).filter((r) => r.stage || r.metaAdsAnuncio);
+}
+
+// Verifica status das integrações no servidor
+async function checkApiStatus() {
+  const el = document.getElementById("apiStatus");
+  try {
+    const res  = await fetch("/api/status");
+    if (!res.ok) throw new Error("Servidor não está rodando");
+    const json = await res.json();
+    const items = [
+      { key: "meta",  label: "Meta API" },
+      { key: "zoho",  label: "Zoho CRM" },
+      { key: "slack", label: "Slack" },
+    ];
+    el.innerHTML = items.map((i) =>
+      `<span class="api-badge ${json[i.key] ? "api-badge--ok" : "api-badge--off"}">
+        ${json[i.key] ? "✓" : "✗"} ${i.label}
+      </span>`
+    ).join("");
+  } catch {
+    el.innerHTML = `<span class="api-badge api-badge--off">✗ Servidor offline — rode <code>node server.js</code></span>`;
+  }
+}
+
+// Busca dados via API e atualiza o dashboard
+document.getElementById("fetchApiBtn").addEventListener("click", async () => {
+  const btn    = document.getElementById("fetchApiBtn");
+  const status = document.getElementById("apiLoadingStatus");
+  btn.disabled = true;
+
+  try {
+    const preset = document.getElementById("apiDatePreset").value;
+    const params = new URLSearchParams();
+    if (preset === "custom") {
+      const since = document.getElementById("apiSince").value;
+      const until = document.getElementById("apiUntil").value;
+      if (!since || !until) throw new Error("Selecione data início e fim para período personalizado.");
+      params.set("since", since);
+      params.set("until", until);
+    } else {
+      params.set("date_preset", preset);
+    }
+
+    status.textContent = "Buscando Meta Ads...";
+    status.className   = "process-status";
+
+    const [metaRes, zohoRes] = await Promise.all([
+      fetch(`/api/meta/insights?${params}`).then((r) => r.json()),
+      fetch("/api/zoho/deals").then((r) => r.json()),
+    ]);
+
+    if (!metaRes.ok) throw new Error(`Meta API: ${metaRes.error}`);
+    if (!zohoRes.ok) throw new Error(`Zoho CRM: ${zohoRes.error}`);
+
+    state.metaRows = metaApiToRows(metaRes.data || []);
+    state.zohoRows = zohoApiToRows(zohoRes.data || []);
+
+    if (state.metaRows.length === 0) throw new Error("Meta API não retornou dados para o período selecionado.");
+
+    const { creatives, unmatchedZoho } = buildCreatives(state.metaRows, state.zohoRows);
+    state.creatives = creatives;
+    state.filtered  = creatives;
+
+    populateFilterOptions(creatives);
+    renderAll();
+
+    const matched = state.zohoRows.length - unmatchedZoho.length;
+    status.textContent = `Dashboard atualizado via API: ${creatives.length} criativos, ${matched}/${state.zohoRows.length} negócios Zoho cruzados.`;
+    status.className   = "process-status success";
+    showToast("Dashboard atualizado via API.", "success");
+
+    document.querySelector('.tab-btn[data-tab="overview"]')?.click();
+  } catch (err) {
+    console.error(err);
+    status.textContent = `Erro: ${err.message}`;
+    status.className   = "process-status error";
+    showToast(err.message, "error", 5000);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Período personalizado — mostra/oculta campos de data
+document.getElementById("apiDatePreset").addEventListener("change", (e) => {
+  const custom = document.getElementById("apiCustomDates");
+  custom.style.display = e.target.value === "custom" ? "flex" : "none";
+});
+
+// Atualiza o botão Enviar Report para usar o endpoint do servidor
+document.getElementById("sendReportBtn").addEventListener("click", async () => {}, true);
+// (override do handler original registrado acima)
+(function overrideSendReport() {
+  const btn = document.getElementById("sendReportBtn");
+  const clone = btn.cloneNode(true);
+  btn.parentNode.replaceChild(clone, btn);
+
+  clone.addEventListener("click", async () => {
+    clone.disabled = true;
+    showToast("Enviando report...", "info", 60000);
+    try {
+      const payload = buildSlackPayload();
+      const res     = await fetch("/api/report/slack", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erro desconhecido");
+      showToast("Report enviado para o Slack com sucesso.", "success", 4000);
+    } catch (err) {
+      // fallback: copia texto para clipboard
+      try {
+        const text = buildSlackMessageText(buildSlackPayload());
+        await navigator.clipboard.writeText(text);
+        showToast("Servidor offline — texto do report copiado. Cole no Slack.", "info", 5000);
+      } catch {
+        showToast(`Erro ao enviar report: ${err.message}`, "error", 5000);
+      }
+    } finally {
+      clone.disabled = !(state.creatives.length > 0);
+    }
+  });
+})();
+
+// Verifica status na inicialização
+checkApiStatus();
+
 /* ---------- Navegação por abas ---------- */
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {

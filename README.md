@@ -1,93 +1,137 @@
 # Report Meta Ads + Zoho CRM | PipeLovers
 
-Dashboard de performance de criativos que cruza exportações do **Meta Ads** com o **Zoho CRM** para mostrar quais anúncios geram mais **leads**, **reuniões** e, principalmente, **assinaturas** — e a que custo. Prioridade de leitura: Assinaturas > Reuniões > Leads.
+Dashboard local para cruzar dados da Meta Graph API com o Zoho CRM e identificar quais criativos, anúncios e campanhas geram mais **assinaturas**, **reuniões** e **leads**.
 
-100% client-side e 100% estático — apenas HTML + CSS + JavaScript puro, com SheetJS e Chart.js via CDN. Sem backend, sem build step, sem variáveis de ambiente. Feito para rodar direto no **GitHub Pages**.
-
-Visual em tema claro com banner gradiente roxo/navy no topo e navegação por abas (📁 Upload, 📊 Visão Geral, 🏆 Rankings & Gráficos, 📋 Tabela Detalhada), inspirado no painel de churn da PipeLovers.
-
-## Estrutura do projeto
-
-```
-.
-├── index.html      # estrutura da página (com navegação por abas)
-├── style.css       # tema claro com banner gradiente
-├── script.js       # leitura de planilhas, cruzamento, métricas, gráficos, abas, report do Slack
-└── README.md
-```
-
-> **Arquivos que podem ser removidos:** `send-slack-report.js`, `vercel.json`, `.env.example` e `package.json` foram criados em uma versão anterior que dependia de um backend na Vercel. Como o projeto agora é 100% GitHub Pages, esses arquivos ficaram sem função — pode excluí-los do repositório com segurança. Veja "Enviando o report para o Slack" abaixo para entender como o envio funciona nesta versão.
+---
 
 ## Como funciona
 
-1. Faça upload da planilha exportada do **Meta Ads** e da planilha exportada do **Zoho CRM**.
-2. Clique em **Atualizar Dashboard**. O script:
-   - Detecta automaticamente a linha de cabeçalho real em cada planilha (útil quando o Zoho exporta linhas de lixo antes do cabeçalho).
-   - Normaliza nomes de colunas, acentos, espaços e caracteres invisíveis.
-   - Agrupa as linhas do Meta por criativo (campanha + conjunto + anúncio).
-   - Cruza cada negócio do Zoho com o criativo correspondente: 1ª prioridade pelo nome do anúncio (`Nome do anúncio` ↔ `Meta Ads - Anuncio`), 2ª prioridade por `Meta Ads - ADs ID`, quando disponível.
-   - Calcula métricas, rankings, badges e insights automáticos.
-3. Use os filtros (data, campanha, conjunto de anúncios, criativo) na aba **📁 Upload** para refinar a visão — tudo recalcula em tempo real.
-4. Navegue pelas abas **📊 Visão Geral**, **🏆 Rankings & Gráficos** e **📋 Tabela Detalhada** para ver cards, badges, insights, gráficos e a tabela completa. Ao atualizar o dashboard com sucesso, a aba "Visão Geral" abre automaticamente.
-5. Exporte os dados filtrados em CSV ou XLSX a qualquer momento.
-6. Clique em **Enviar Report** para gerar o texto do resumo (ver seção do Slack abaixo) — geração manual, nunca automática.
+O projeto roda localmente em `http://localhost:3000`. Todas as credenciais ficam no arquivo `.env` — **nunca são enviadas ao GitHub ou expostas ao frontend**.
 
-### Colunas esperadas
+```
+Browser → Express (server.js) → Meta Graph API
+                              → Zoho CRM API
+                              → Slack Webhook
+```
 
-**Meta Ads:** Nome da campanha, Nome do conjunto de anúncios, Nome do anúncio, Impressões, Frequência, Valor usado (BRL), Cliques (todos), CPM, CTR, CPC, Leads, Data início, Data fim.
+---
 
-**Zoho CRM:** Nome Negócios, Nome Contato, Origem, Meta Ads - ADs ID, Meta Ads - Anuncio, Meta Ads - Campanha, Meta Ads - Lead ID, Meta Ads Campanha ID, ICP, Stage, Hora de Criação.
-
-### Regras de negócio
-
-- **Reunião Gerada**: `Stage` igual a "Reunião Agendada" ou "Reunião Realizada".
-- **Assinatura Realizada**: `Stage` contém qualquer um dos termos configurados em `CONFIG.signupStageKeywords` (em `script.js`): `assinatura`, `assinado`, `fechado ganho`, `ganho`, `venda realizada`. Ajuste essa lista conforme o vocabulário do seu funil.
-- **Fórmulas**: CPL Meta = Valor Gasto ÷ Leads Meta · Custo por Reunião = Valor Gasto ÷ Reuniões · Custo por Assinatura = Valor Gasto ÷ Assinaturas · Taxa Lead→Reunião = Reuniões ÷ Leads Zoho × 100 · Taxa Lead→Assinatura = Assinaturas ÷ Leads Zoho × 100.
-
-## Rodando localmente
-
-Não há build step. Basta servir os arquivos estáticos:
+## Instalação
 
 ```bash
-npx serve .
-# ou
-python3 -m http.server 8080
+git clone https://github.com/jpofrancisco3/Report-Meta.git
+cd Report-Meta
+npm install
 ```
 
-Abra o endereço indicado no terminal no navegador.
+---
 
-## Deploy (GitHub Pages)
+## Configuração
 
-1. Faça commit e push do projeto para o repositório.
-2. Em **Settings → Pages**, selecione a branch (`main`) e a pasta raiz (`/`).
-3. Acesse a URL gerada pelo GitHub Pages.
+Copie o `.env.example` e preencha com suas credenciais:
 
-Não há mais nenhuma etapa de backend, variável de ambiente ou serviço externo a configurar — o site funciona inteiro a partir desses arquivos estáticos.
+```bash
+cp .env.example .env
+```
 
-## Enviando o report para o Slack
+### Meta Graph API
 
-Como o GitHub Pages só serve arquivos estáticos, o site não tem como guardar nenhum segredo (token, webhook) com segurança — qualquer coisa escrita em `script.js` fica visível a qualquer pessoa que abrir "Ver código-fonte" da página. Por isso o envio ao Slack não acontece automaticamente a partir do site. O fluxo é:
+```env
+META_ACCESS_TOKEN=EAANt50g...        # Token de usuário (long-lived, 60 dias)
+META_APP_SECRET=219080b6...          # App Secret (App-Claude-Pipe, ID 965265046083130)
+META_AD_ACCOUNT_ID=652242416740080   # sem o prefixo act_
+META_API_VERSION=v23.0
+```
 
-1. No dashboard, clique em **Enviar Report**.
-2. O script monta o texto do resumo no formato oficial (📊 Report Meta Ads + Zoho, Resumo do Dia, Acumulado, Top Criativos, Insight do período) e copia para a área de transferência (ou baixa `report-slack.txt`, caso o navegador bloqueie o clipboard).
-3. Cole esse texto no Slack manualmente, **ou** volte para a conversa com o Claude no Cowork e peça para ele enviar — o Claude já está conectado ao workspace do Slack (PipeLovers) e pode postar a mensagem direto no canal combinado usando esse conector, sem precisar de webhook nem de backend.
+Para renovar o token: [developers.facebook.com](https://developers.facebook.com) → App-Claude-Pipe → Tools → Graph API Explorer → gerar User Token com `ads_management` + `ads_read`.
 
-O botão mostra os estados "Gerando report...", "Report enviado com sucesso." (texto copiado/baixado) e "Erro ao enviar report." (se algo falhar ao montar o texto). O envio nunca é automático — só acontece quando alguém clica no botão.
+### Zoho CRM API
 
-## Atualizar Dashboard vs. Enviar Report
+```env
+ZOHO_CLIENT_ID=
+ZOHO_CLIENT_SECRET=
+ZOHO_REFRESH_TOKEN=
+ZOHO_ACCOUNTS_URL=https://accounts.zoho.com
+ZOHO_API_DOMAIN=https://www.zohoapis.com
+ZOHO_MODULE=Deals
+```
 
-- **Atualizar Dashboard**: lê os dois arquivos selecionados, refaz todo o cruzamento e re-renderiza cards, gráficos, tabela, rankings e insights. Pode ser clicado quantas vezes for necessário, inclusive com arquivos diferentes.
-- **Enviar Report**: usa os dados já processados na tela (resumo do dia + acumulado + top criativos + insight automático), monta o texto no formato do template e copia/baixa para você enviar ao Slack (manualmente ou via Claude), somente quando clicado.
+Para obter o refresh token: [api-console.zoho.com](https://api-console.zoho.com) → Self Client → gerar token com escopo `ZohoCRM.modules.ALL`.
 
-## Personalização rápida
+### Slack
 
-Os principais pontos de ajuste estão no topo de `script.js`, no objeto `CONFIG`:
+```env
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+Crie um Incoming Webhook em: [api.slack.com/apps](https://api.slack.com/apps).
+
+---
+
+## Como rodar
+
+```bash
+node server.js
+# ou
+npm run dev
+```
+
+Acesse: [http://localhost:3000](http://localhost:3000)
+
+O terminal mostrará quais integrações estão configuradas.
+
+---
+
+## Como usar
+
+### Buscar via API (recomendado)
+
+1. Abra o dashboard em `http://localhost:3000`
+2. No painel **Buscar via API**, selecione o período
+3. Clique em **Buscar via API**
+4. Os dados são buscados diretamente da Meta e do Zoho e cruzados automaticamente
+
+### Upload Manual (fallback)
+
+Caso a API não esteja disponível:
+
+1. Exporte a planilha do Meta Ads (nível de anúncio) em `.xlsx`
+2. Exporte os registros do Zoho CRM em `.xlsx`
+3. Faça upload no painel de upload
+4. Clique em **Atualizar Dashboard**
+
+### Enviar Report para o Slack
+
+Clique em **Enviar Report** — o resumo do dia é enviado automaticamente para o canal configurado no webhook. Se o servidor estiver offline, o texto é copiado para a área de transferência.
+
+---
+
+## Campos do Zoho CRM
+
+Os nomes técnicos dos campos customizados ficam em `config/fieldMap.js`. Edite este arquivo se os nomes no seu Zoho forem diferentes:
 
 ```js
-const CONFIG = {
-  meetingStages: ["reuniao agendada", "reuniao realizada"],
-  signupStageKeywords: ["assinatura", "assinado", "fechado ganho", "ganho", "venda realizada"],
-  topN: 8,        // itens exibidos nos gráficos "Top N"
-  rankingSize: 5, // itens exibidos em cada ranking
-};
+metaAdId:   "Meta_Ads_ADs_ID",    // Meta Ads - ADs ID
+metaAdName: "Meta_Ads_Anuncio",   // Meta Ads - Anuncio
+// ...
 ```
+
+---
+
+## Métricas
+
+| Métrica | Fórmula |
+|---------|---------|
+| CPL Meta | Gasto ÷ Leads Meta |
+| Custo por Reunião | Gasto ÷ Reuniões Geradas |
+| Custo por Assinatura | Gasto ÷ Assinaturas Realizadas |
+| Taxa Lead → Reunião | Reuniões ÷ Leads Zoho × 100 |
+| Taxa Lead → Assinatura | Assinaturas ÷ Leads Zoho × 100 |
+
+---
+
+## Segurança
+
+- `.env` está no `.gitignore` — nunca é commitado
+- Tokens nunca aparecem no frontend nem no console do browser
+- Todas as chamadas à Meta, Zoho e Slack passam pelo servidor Express local
