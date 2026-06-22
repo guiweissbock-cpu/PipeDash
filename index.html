@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Report Meta Ads + Zoho CRM | PipeLovers</title>
 <link rel="stylesheet" href="style.css" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="/node_modules/xlsx/dist/xlsx.full.min.js"></script>
+<script src="/node_modules/chart.js/dist/chart.umd.js"></script>
 </head>
 <body>
 
@@ -30,16 +30,49 @@
   <button class="tab-btn" data-tab="overview">📊 Visão Geral</button>
   <button class="tab-btn" data-tab="rankings">🏆 Rankings &amp; Gráficos</button>
   <button class="tab-btn" data-tab="table">📋 Tabela Detalhada</button>
+  <button class="tab-btn" data-tab="livemeta">📡 Live Meta</button>
+  <button class="tab-btn" data-tab="googleads">🎯 Google Ads</button>
+  <button class="tab-btn" data-tab="insights">💡 Insights IA</button>
+  <button class="tab-btn" data-tab="fin">💰 Financeiro</button>
 </div>
 
 <main class="layout">
+
+  <!-- Filtros globais — visíveis em todas as abas após carregar dados -->
+  <section class="card filters-panel" id="filtersPanel" hidden>
+    <div class="filters-grid">
+      <div class="filter-field">
+        <label for="filterStart">Data início <span class="hint">(criação do lead)</span></label>
+        <input type="date" id="filterStart" />
+      </div>
+      <div class="filter-field">
+        <label for="filterEnd">Data fim</label>
+        <input type="date" id="filterEnd" />
+      </div>
+      <div class="filter-field">
+        <label for="filterCampanha">Campanha</label>
+        <select id="filterCampanha"><option value="">Todas</option></select>
+      </div>
+      <div class="filter-field">
+        <label for="filterConjunto">Conjunto de anúncios</label>
+        <select id="filterConjunto"><option value="">Todos</option></select>
+      </div>
+      <div class="filter-field">
+        <label for="filterCriativo">Criativo/Anúncio</label>
+        <input type="text" id="filterCriativo" placeholder="Buscar por nome..." />
+      </div>
+      <div class="filter-field filter-field--action">
+        <button id="clearFiltersBtn" class="btn btn--ghost">Limpar filtros</button>
+      </div>
+    </div>
+  </section>
 
   <!-- Tab: Upload -->
   <div class="tab-panel active" data-tab="upload">
 
     <!-- Buscar via API -->
     <section class="card api-panel" id="apiPanel">
-      <h2 class="section-title">1. Buscar via API <span class="hint">(Meta + Zoho direto)</span></h2>
+      <h2 class="section-title">1. Buscar via API <span class="hint">(atualização global — Meta · Google Ads · Zoho)</span></h2>
       <div class="api-status" id="apiStatus"></div>
       <div class="api-filters">
         <div class="filter-field">
@@ -65,6 +98,15 @@
         <button id="fetchApiBtn" class="btn btn--primary">Buscar via API</button>
         <span id="apiLoadingStatus" class="process-status"></span>
       </div>
+      <!-- Painel de progresso da atualização global -->
+      <div class="api-progress-panel" id="apiProgressPanel" hidden>
+        <div class="api-step" id="apStep-meta">Meta Ads</div>
+        <div class="api-step" id="apStep-gads">Google Ads</div>
+        <div class="api-step" id="apStep-zoho">Zoho CRM</div>
+        <div class="api-step" id="apStep-slack">Slack MQL</div>
+        <div class="api-step" id="apStep-process">Processando dados</div>
+        <div class="api-step" id="apStep-render">Atualizando telas</div>
+      </div>
     </section>
 
     <!-- Upload Manual -->
@@ -88,85 +130,121 @@
       </div>
     </section>
 
-    <!-- Filters -->
-    <section class="card filters-panel" id="filtersPanel" hidden>
-      <h2 class="section-title">Filtros</h2>
-      <div class="filters-grid">
-        <div class="filter-field">
-          <label for="filterStart">Data início</label>
-          <input type="date" id="filterStart" />
-        </div>
-        <div class="filter-field">
-          <label for="filterEnd">Data fim</label>
-          <input type="date" id="filterEnd" />
-        </div>
-        <div class="filter-field">
-          <label for="filterCampanha">Campanha</label>
-          <select id="filterCampanha"><option value="">Todas</option></select>
-        </div>
-        <div class="filter-field">
-          <label for="filterConjunto">Conjunto de anúncios</label>
-          <select id="filterConjunto"><option value="">Todos</option></select>
-        </div>
-        <div class="filter-field">
-          <label for="filterCriativo">Criativo/Anúncio</label>
-          <input type="text" id="filterCriativo" placeholder="Buscar por nome do anúncio" />
-        </div>
-        <div class="filter-field filter-field--action">
-          <button id="clearFiltersBtn" class="btn btn--ghost">Limpar filtros</button>
-        </div>
-      </div>
-    </section>
-
   </div>
 
   <!-- Tab: Visão Geral -->
   <div class="tab-panel" data-tab="overview">
 
-    <!-- Top cards -->
-    <section class="cards-grid" id="cardsGrid" hidden>
-      <div class="metric-card"><span class="metric-label">Investimento Total</span><span class="metric-value" id="cardInvestimento">—</span></div>
-      <div class="metric-card"><span class="metric-label">Impressões</span><span class="metric-value" id="cardImpressoes">—</span></div>
-      <div class="metric-card"><span class="metric-label">Cliques</span><span class="metric-value" id="cardCliques">—</span></div>
-      <div class="metric-card"><span class="metric-label">Leads Meta</span><span class="metric-value" id="cardLeadsMeta">—</span></div>
-      <div class="metric-card"><span class="metric-label">Leads Zoho</span><span class="metric-value" id="cardLeadsZoho">—</span></div>
-      <div class="metric-card metric-card--highlight"><span class="metric-label">Reuniões Geradas</span><span class="metric-value" id="cardReunioes">—</span></div>
-      <div class="metric-card metric-card--highlight-strong"><span class="metric-label">Assinaturas Realizadas</span><span class="metric-value" id="cardAssinaturas">—</span></div>
-      <div class="metric-card"><span class="metric-label">CPL Meta</span><span class="metric-value" id="cardCplMeta">—</span></div>
-      <div class="metric-card"><span class="metric-label">Custo por Reunião</span><span class="metric-value" id="cardCustoReuniao">—</span></div>
-      <div class="metric-card"><span class="metric-label">Custo por Assinatura</span><span class="metric-value" id="cardCustoAssinatura">—</span></div>
+    <!-- Barra de ação — sempre visível no topo da aba -->
+    <div class="ov-report-bar">
+      <label class="ov-report-label" for="reportDatePicker">📅 Data do Report</label>
+      <input type="date" id="reportDatePicker" class="ov-report-date-input" min="2026-06-01">
+      <button id="ovSendReportBtn" class="btn btn--slack">📤 Enviar Report Diário</button>
+    </div>
+
+    <!-- Placeholder inicial -->
+    <div id="ovPlaceholder" class="card ov-placeholder">
+      Carregue o relatório Meta Ads ou atualize a aba Google Ads para visualizar o dashboard executivo.
+    </div>
+
+    <!-- Cards executivos (topo) -->
+    <div class="ov-exec-cards" id="ovExecSection" hidden>
+      <div class="ov-exec-card ov-exec-card--highlight">
+        <span class="ov-exec-label">Investimento Total</span>
+        <span class="ov-exec-value" id="ovInvestTotal">—</span>
+      </div>
+      <div class="ov-exec-card">
+        <span class="ov-exec-label">Leads Totais</span>
+        <span class="ov-exec-value" id="ovLeadsTotal">—</span>
+      </div>
+      <div class="ov-exec-card">
+        <span class="ov-exec-label">Reuniões Totais</span>
+        <span class="ov-exec-value" id="ovReunioesTotal">—</span>
+      </div>
+      <div class="ov-exec-card">
+        <span class="ov-exec-label">Assinaturas Totais</span>
+        <span class="ov-exec-value" id="ovAssinaturasTotal">—</span>
+      </div>
+      <div class="ov-exec-card ov-exec-card--highlight">
+        <span class="ov-exec-label">CPA Consolidado</span>
+        <span class="ov-exec-value" id="ovCpaTotal">—</span>
+      </div>
+      <div class="ov-exec-card ov-exec-card--highlight">
+        <span class="ov-exec-label">Conversão Reunião → Assinatura</span>
+        <span class="ov-exec-value" id="ovConvTotal">—</span>
+      </div>
+    </div>
+
+    <!-- Tabela comparativa -->
+    <section class="card" id="ovComparisonSection" hidden>
+      <h3 class="section-title" style="margin-bottom:16px">Comparativo Meta × Google Ads</h3>
+      <div class="ov-comparison-wrap">
+        <table class="ov-comparison-table">
+          <thead>
+            <tr>
+              <th>Métrica</th>
+              <th class="ov-th-meta">Meta Ads</th>
+              <th class="ov-th-google">Google Ads</th>
+              <th class="ov-th-total">Total / Consolidado</th>
+            </tr>
+          </thead>
+          <tbody id="ovComparisonBody"></tbody>
+        </table>
+      </div>
     </section>
 
-    <!-- Badges -->
-    <section class="badges-grid" id="badgesGrid" hidden>
-      <div class="badge-card badge-card--gold">
-        <span class="badge-emoji">🥇</span>
-        <div>
-          <span class="badge-title">Melhor Criativo por Assinaturas</span>
-          <span class="badge-value" id="badgeAssinaturas">—</span>
-        </div>
-      </div>
-      <div class="badge-card badge-card--silver">
-        <span class="badge-emoji">🥈</span>
-        <div>
-          <span class="badge-title">Melhor Criativo por Reuniões</span>
-          <span class="badge-value" id="badgeReunioes">—</span>
-        </div>
-      </div>
-      <div class="badge-card badge-card--bronze">
-        <span class="badge-emoji">🥉</span>
-        <div>
-          <span class="badge-title">Melhor Criativo por Leads</span>
-          <span class="badge-value" id="badgeLeads">—</span>
-        </div>
-      </div>
-    </section>
+    <!-- Gráficos comparativos -->
+    <div class="ov-charts-grid" id="ovChartsSection" hidden>
+      <section class="card"><h3 class="chart-title">Investimento</h3><canvas id="ovChartInvest"></canvas></section>
+      <section class="card"><h3 class="chart-title">Reuniões</h3><canvas id="ovChartReunioes"></canvas></section>
+      <section class="card"><h3 class="chart-title">Assinaturas</h3><canvas id="ovChartAssinaturas"></canvas></section>
+      <section class="card"><h3 class="chart-title">CPL (custo por reunião)</h3><canvas id="ovChartCpl"></canvas></section>
+      <section class="card"><h3 class="chart-title">CPA (custo por assinatura)</h3><canvas id="ovChartCpa"></canvas></section>
+      <section class="card"><h3 class="chart-title">Conversão Reunião → Assinatura</h3><canvas id="ovChartConv"></canvas></section>
+    </div>
 
-    <!-- Insights -->
-    <section class="card insights-panel" id="insightsPanel" hidden>
-      <h2 class="section-title">Insights Automáticos</h2>
-      <ul class="insights-list" id="insightsList"></ul>
-    </section>
+    <!-- Insights: Meta | Google | Consolidado -->
+    <div class="ov-insights-grid" id="ovInsightsSection" hidden>
+      <section class="card">
+        <div class="ov-insight-header">
+          <div class="ov-insight-dot ov-insight-dot--meta"></div>
+          <h3 class="section-title" style="margin:0">Insights Meta Ads</h3>
+        </div>
+        <ul class="ov-insight-list" id="ovInsightsMeta"></ul>
+      </section>
+      <section class="card">
+        <div class="ov-insight-header">
+          <div class="ov-insight-dot ov-insight-dot--google"></div>
+          <h3 class="section-title" style="margin:0">Insights Google Ads</h3>
+        </div>
+        <ul class="ov-insight-list" id="ovInsightsGoogle"></ul>
+      </section>
+      <section class="card">
+        <div class="ov-insight-header">
+          <div class="ov-insight-dot ov-insight-dot--total"></div>
+          <h3 class="section-title" style="margin:0">Consolidado</h3>
+        </div>
+        <ul class="ov-insight-list" id="ovInsightsTotal"></ul>
+      </section>
+    </div>
+
+    <!-- Elementos legados mantidos no DOM (ocultos) para não quebrar renderCards/renderBadges/renderInsights -->
+    <div hidden aria-hidden="true">
+      <section id="cardsGrid">
+        <span id="cardInvestimento"></span><span id="cardImpressoes"></span>
+        <span id="cardCliques"></span><span id="cardLeadsMeta"></span>
+        <span id="cardLeadsZoho"></span><span id="cardReunioes"></span>
+        <span id="cardAssinaturas"></span><span id="cardCplMeta"></span>
+        <span id="cardCustoReuniao"></span><span id="cardCustoAssinatura"></span>
+      </section>
+      <section id="gadsOverviewSection"><div id="gadsOverviewCards"></div></section>
+      <section id="badgesGrid">
+        <span id="badgeAssinaturas"></span>
+        <span id="badgeReunioes"></span>
+        <span id="badgeLeads"></span>
+      </section>
+      <section id="insightsPanel"><ul id="insightsList"></ul></section>
+    </div>
 
   </div>
 
@@ -239,7 +317,481 @@
 
   </div>
 
+  <!-- Tab: Live Meta -->
+  <div class="tab-panel" data-tab="livemeta">
+
+    <section class="card livemeta-header">
+      <div class="livemeta-title-row">
+        <h2 class="section-title" style="margin:0">Live Meta</h2>
+        <span id="liveMetaLastUpdate" class="livemeta-timestamp">Nenhuma atualização ainda</span>
+      </div>
+      <p class="livemeta-account">Conta: act_652242416740080</p>
+    </section>
+
+    <section class="card">
+      <div class="api-filters">
+        <div class="filter-field">
+          <label for="liveMetaPreset">Período</label>
+          <select id="liveMetaPreset">
+            <option value="today">Hoje</option>
+            <option value="yesterday">Ontem</option>
+            <option value="last_7d">Últimos 7 dias</option>
+            <option value="last_30d" selected>Últimos 30 dias</option>
+            <option value="this_month">Este mês</option>
+            <option value="last_month">Mês anterior</option>
+            <option value="custom">Período personalizado</option>
+          </select>
+        </div>
+        <div id="liveMetaCustomDates" class="livemeta-custom-dates" style="display:none">
+          <div class="filter-field">
+            <label for="liveMetaSince">Data início</label>
+            <input type="date" id="liveMetaSince" />
+          </div>
+          <div class="filter-field">
+            <label for="liveMetaUntil">Data fim</label>
+            <input type="date" id="liveMetaUntil" />
+          </div>
+        </div>
+        <div class="api-actions">
+          <button id="liveMetaRefreshBtn" class="btn btn--primary">Atualizar Dados</button>
+          <span id="liveMetaStatus" class="process-status"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Métricas META do Zoho CRM — calculadas por origem META + etapa -->
+    <section class="cards-grid" id="liveMetaMetricsSection" style="display:none">
+      <div class="metric-card">
+        <span class="metric-label">Leads META no CRM</span>
+        <span class="metric-value" id="liveMetaLeadsMeta">—</span>
+      </div>
+      <div class="metric-card metric-card--highlight">
+        <span class="metric-label">Reuniões Geradas META</span>
+        <span class="metric-value" id="liveMetaReunioes">—</span>
+      </div>
+      <div class="metric-card metric-card--highlight-strong">
+        <span class="metric-label">Assinaturas Geradas META</span>
+        <span class="metric-value" id="liveMetaAssinaturas">—</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Conversão Lead→Reunião</span>
+        <span class="metric-value" id="liveMetaTaxaReuniao">—</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Conversão Reunião→Assinatura</span>
+        <span class="metric-value" id="liveMetaTaxaAssinatura">—</span>
+      </div>
+    </section>
+
+    <!-- Gráfico de Evolução Diária -->
+    <section class="card lm-daily-section" id="lmDailySection" style="display:none">
+      <div class="lm-daily-header">
+        <h3 class="section-title" style="margin:0">Evolução Diária</h3>
+        <span class="lm-daily-hint">Clique nas métricas para ativar/desativar</span>
+      </div>
+      <div class="lm-daily-groups" id="lmDailyToggles"></div>
+      <div class="lm-daily-chart-wrap">
+        <canvas id="lmDailyCanvas"></canvas>
+      </div>
+    </section>
+
+    <section class="card table-panel">
+      <div class="table-scroll">
+        <table id="liveMetaTable">
+          <thead>
+            <tr>
+              <th>Criativo</th>
+              <th>Nome da campanha</th>
+              <th>Nome do conjunto de anúncios</th>
+              <th>Nome do anúncio</th>
+              <th class="col-num sortable" data-col="reach">Alcance <span class="lm-sort-icon">↕</span></th>
+              <th class="col-num sortable" data-col="impressions">Impressões <span class="lm-sort-icon">↕</span></th>
+              <th class="col-num sortable" data-col="frequency">Frequência <span class="lm-sort-icon">↕</span></th>
+              <th class="col-num sortable" data-col="spend">Valor usado <span class="lm-sort-icon">↕</span></th>
+              <th class="col-num sortable" data-col="clicks">Cliques (todos) <span class="lm-sort-icon">↕</span></th>
+              <th class="col-num sortable" data-col="cpm">CPM <span class="lm-sort-icon">↕</span></th>
+              <th class="col-num sortable" data-col="ctr">CTR <span class="lm-sort-icon">↕</span></th>
+              <th class="col-num sortable" data-col="cpl">Custo por lead <span class="lm-sort-icon">↕</span></th>
+              <th class="col-num sortable" data-col="cpc">CPC (todos) <span class="lm-sort-icon">↕</span></th>
+              <th class="col-num sortable" data-col="leads">Leads na Meta <span class="lm-sort-icon">↕</span></th>
+              <th class="col-num sortable" data-col="mql">MQL <span class="lm-sort-icon">↕</span></th>
+              <th class="col-num sortable" data-col="conv_mql">Conv. Lead→MQL <span class="lm-sort-icon">↕</span></th>
+              <th class="col-num sortable" data-col="reunioes">Reuniões <span class="lm-sort-icon">↕</span></th>
+              <th class="col-num sortable" data-col="assinaturas">Assinaturas <span class="lm-sort-icon">↕</span></th>
+              <th>Veiculação do anúncio</th>
+            </tr>
+          </thead>
+          <tbody id="liveMetaBody">
+            <tr><td colspan="19" class="livemeta-empty">Clique em <strong>Atualizar Dados</strong> para carregar o relatório.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Tab: Google Ads ───────────────────────────────────────────────────── -->
+  <div class="tab-panel" data-tab="googleads">
+
+    <!-- Cabeçalho -->
+    <section class="card gads-header-card">
+      <div class="gads-header-row">
+        <div>
+          <h2 class="section-title" style="margin:0">Google Ads</h2>
+          <p class="gads-account-label">Fonte: Zoho CRM · Conta Ads: 975-594-5992</p>
+        </div>
+        <span id="gadsLastUpdate" class="livemeta-timestamp">Nenhuma atualização ainda</span>
+      </div>
+    </section>
+
+    <!-- Filtros -->
+    <section class="card">
+      <div class="api-filters" style="flex-wrap:wrap;gap:12px">
+        <div class="filter-field">
+          <label for="gadsPreset">Período</label>
+          <select id="gadsPreset">
+            <option value="today">Hoje</option>
+            <option value="yesterday">Ontem</option>
+            <option value="last_7d">Últimos 7 dias</option>
+            <option value="last_14d">Últimos 14 dias</option>
+            <option value="last_30d" selected>Últimos 30 dias</option>
+            <option value="this_month">Este mês</option>
+            <option value="last_month">Mês anterior</option>
+            <option value="custom">Personalizado</option>
+          </select>
+        </div>
+        <div id="gadsCustomDates" style="display:none;gap:8px;align-items:flex-end" class="api-filters">
+          <div class="filter-field">
+            <label for="gadsSince">Início</label>
+            <input type="date" id="gadsSince" />
+          </div>
+          <div class="filter-field">
+            <label for="gadsUntil">Fim</label>
+            <input type="date" id="gadsUntil" />
+          </div>
+        </div>
+        <div class="api-actions">
+          <button id="gadsRefreshBtn" class="btn btn--primary">Atualizar Dados</button>
+          <span id="gadsStatus" class="process-status"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Reuniões/Assinaturas Google Ads (fonte: Zoho CRM) -->
+    <section class="cards-grid gads-summary-grid" id="gadsSummary" style="display:none"></section>
+
+    <!-- Resumo de mídia Google Ads (fonte: API Google Ads) -->
+    <section class="cards-grid" id="gadsApiSummary" style="display:none"></section>
+
+    <!-- Tabela de campanhas -->
+    <section class="card table-panel" id="gadsCampaignsSection" style="display:none">
+      <div class="table-panel__header">
+        <h3 class="section-title">Campanhas</h3>
+        <input type="search" id="gadsCampaignSearch" placeholder="Buscar campanha..." class="gads-search-input" />
+      </div>
+      <div class="table-scroll">
+        <table id="gadsCampaignsTable">
+          <thead>
+            <tr>
+              <th class="gads-sortable" data-key="name">Campanha <span class="sort-icon"></span></th>
+              <th class="gads-sortable col-num" data-key="costBRL">Investimento <span class="sort-icon"></span></th>
+              <th class="gads-sortable col-num" data-key="impressions">Impressões <span class="sort-icon"></span></th>
+              <th class="gads-sortable col-num" data-key="clicks">Cliques <span class="sort-icon"></span></th>
+              <th class="gads-sortable col-num" data-key="ctr">CTR <span class="sort-icon"></span></th>
+              <th class="gads-sortable col-num" data-key="cpc">CPC <span class="sort-icon"></span></th>
+              <th class="gads-sortable col-num" data-key="conversions">Conversões <span class="sort-icon"></span></th>
+              <th class="gads-sortable col-num" data-key="cpa">Custo/Conv. <span class="sort-icon"></span></th>
+            </tr>
+          </thead>
+          <tbody id="gadsCampaignsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Top 10 Palavras-chave e Top 10 Termos de Pesquisa -->
+    <div class="gads-insights-grid" id="gadsInsightsSection" style="display:none">
+      <section class="card">
+        <h3 class="section-title">Top 10 Palavras-chave</h3>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Palavra-chave</th>
+                <th class="col-num">Impressões</th>
+                <th class="col-num">Cliques</th>
+                <th class="col-num">CTR</th>
+                <th class="col-num">CPC</th>
+                <th class="col-num">Conversões</th>
+              </tr>
+            </thead>
+            <tbody id="gadsKeywordsBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="card">
+        <h3 class="section-title">Top 10 Termos de Pesquisa</h3>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Termo pesquisado</th>
+                <th class="col-num">Impressões</th>
+                <th class="col-num">Cliques</th>
+                <th class="col-num">CTR</th>
+                <th class="col-num">Conversões</th>
+              </tr>
+            </thead>
+            <tbody id="gadsSearchTermsBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+  </div><!-- /tab googleads -->
+
+  <!-- ── TAB: INSIGHTS IA ──────────────────────────────────────────────────── -->
+  <div class="tab-panel" data-tab="insights">
+
+    <div class="ia-header">
+      <div class="ia-header-text">
+        <h2 class="ia-title">Insights IA</h2>
+        <p class="ia-subtitle">Análise automática dos criativos · Live Meta</p>
+      </div>
+      <span id="iaLastUpdate" class="ia-last-update"></span>
+    </div>
+
+    <div id="iaPlaceholder" class="ia-placeholder">
+      <div class="ia-placeholder-icon">💡</div>
+      <p>Clique em <strong>Buscar via API</strong> para carregar os dados do Live Meta e gerar os insights automáticos.</p>
+    </div>
+
+    <div id="iaContent" hidden>
+
+      <!-- Rankings -->
+      <section class="card ia-section">
+        <h3 class="ia-section-title">Rankings dos criativos</h3>
+        <div class="ia-rankings-grid">
+          <div class="ia-rank-block">
+            <h4 class="ia-rank-title">CTR</h4>
+            <div id="iaTopCtr"></div>
+          </div>
+          <div class="ia-rank-block">
+            <h4 class="ia-rank-title">Reuniões</h4>
+            <div id="iaTopMeet"></div>
+          </div>
+          <div class="ia-rank-block">
+            <h4 class="ia-rank-title">Assinaturas</h4>
+            <div id="iaTopSign"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Padrões por funil -->
+      <section class="card ia-section">
+        <h3 class="ia-section-title">Padrões por funil</h3>
+        <div id="iaPatterns"></div>
+      </section>
+
+      <!-- O que aprendemos -->
+      <section class="card ia-section">
+        <h3 class="ia-section-title">O que aprendemos</h3>
+        <div id="iaLearnings"></div>
+      </section>
+
+      <!-- Próximos criativos recomendados -->
+      <section class="card ia-section">
+        <h3 class="ia-section-title">Próximos criativos recomendados</h3>
+        <div id="iaRecs"></div>
+      </section>
+
+      <!-- Novas ideias para testar -->
+      <section class="card ia-section">
+        <h3 class="ia-section-title">Novas ideias para testar</h3>
+        <p class="ia-ideas-hint">Baseadas nos padrões identificados nos criativos de melhor performance.</p>
+        <div id="iaIdeas"></div>
+      </section>
+
+      <!-- ── Inteligência Avançada ─────────────────────────── -->
+      <div class="ia-intel-sep"><span>Inteligência de Assuntos · Ofertas · Mensagens</span></div>
+
+      <section class="card ia-section">
+        <h3 class="ia-section-title">🎯 Assuntos que Mais Convertem</h3>
+        <p class="ia-section-desc">Quais temas geram mais cliques, leads, reuniões e assinaturas</p>
+        <div id="iaTopics"></div>
+      </section>
+
+      <section class="card ia-section">
+        <h3 class="ia-section-title">🎁 Inteligência de Ofertas</h3>
+        <p class="ia-section-desc">Qual oferta converte melhor em cada etapa do funil</p>
+        <div id="iaOffers"></div>
+      </section>
+
+      <section class="card ia-section">
+        <h3 class="ia-section-title">🔄 Funis Recomendados</h3>
+        <p class="ia-section-desc">Combinações anúncio → oferta → conversão com maior potencial</p>
+        <div id="iaFunnels"></div>
+      </section>
+
+      <section class="card ia-section">
+        <h3 class="ia-section-title">💬 Mensagens que Funcionam</h3>
+        <p class="ia-section-desc">Palavras e padrões dos criativos com maior geração de reuniões</p>
+        <div id="iaMessages"></div>
+      </section>
+
+      <section class="card ia-section">
+        <h3 class="ia-section-title">🎨 Padrões de Criativos Vencedores</h3>
+        <p class="ia-section-desc">Características que diferenciam os criativos de alta performance</p>
+        <div id="iaCreativePatterns"></div>
+      </section>
+
+      <!-- ── Google Ads Intelligence ───────────────────────── -->
+      <div class="ia-intel-sep"><span>Google Ads · Inteligência de Tráfego</span></div>
+
+      <section class="card ia-section">
+        <h3 class="ia-section-title">🔍 Análise de Palavras-chave e Termos</h3>
+        <p class="ia-section-desc">Oportunidades, negativações e gestão de campanhas baseada nos dados reais</p>
+        <div id="iaGadsIntel"></div>
+      </section>
+
+      <!-- ── Crescimento ────────────────────────────────────── -->
+      <div class="ia-intel-sep"><span>Crescimento · Próximas Ações</span></div>
+
+      <section class="card ia-section">
+        <h3 class="ia-section-title">🚀 Próximas Oportunidades</h3>
+        <p class="ia-section-desc">O que escalar, testar e pausar com base nos dados reais</p>
+        <div id="iaGrowth"></div>
+      </section>
+
+      <section class="card ia-section">
+        <h3 class="ia-section-title">🎯 Próximas Campanhas Google Ads</h3>
+        <p class="ia-section-desc">Novas palavras-chave, grupos de anúncios e realocação de budget</p>
+        <div id="iaGadsSuggestions"></div>
+      </section>
+
+    </div>
+  </div><!-- /tab insights -->
+
+  <!-- Tab: Financeiro -->
+  <div class="tab-panel" data-tab="fin">
+
+    <div class="fin-header">
+      <div>
+        <h2 class="fin-title">Financeiro</h2>
+        <p class="fin-subtitle">Gestão de orçamento por plataforma e iniciativa · Junho 2026</p>
+      </div>
+    </div>
+
+    <div id="finPlaceholder" class="fin-placeholder">
+      <div class="fin-placeholder-icon">💰</div>
+      <p>Clique em <strong>Buscar via API</strong> para carregar os dados financeiros.</p>
+    </div>
+
+    <div id="finContent" hidden>
+
+      <div id="finAlerts" class="fin-alerts"></div>
+
+      <!-- Resumo do Mês -->
+      <section class="card fin-section">
+        <h3 class="fin-section-title">Resumo do Mês</h3>
+        <div id="finSummaryCards" class="fin-summary-grid"></div>
+      </section>
+
+      <!-- Por Plataforma -->
+      <section class="card fin-section">
+        <div class="fin-section-header">
+          <h3 class="fin-section-title">Por Plataforma</h3>
+          <span class="fin-section-hint">Clique no orçamento para editar</span>
+        </div>
+        <div class="fin-table-wrap" id="finPlatformWrap"></div>
+      </section>
+
+      <!-- Por Iniciativa -->
+      <section class="card fin-section">
+        <div class="fin-section-header">
+          <h3 class="fin-section-title">Por Iniciativa</h3>
+          <span class="fin-section-hint">Clique no nome ou orçamento para editar</span>
+        </div>
+        <div class="fin-table-wrap" id="finInitWrap"></div>
+      </section>
+
+      <!-- Campanhas -->
+      <section class="card fin-section">
+        <h3 class="fin-section-title">Campanhas</h3>
+        <div class="fin-table-wrap fin-camps-wrap" id="finCampsWrap"></div>
+      </section>
+
+      <!-- Charts -->
+      <section class="card fin-section">
+        <h3 class="fin-section-title">Distribuição do Investimento</h3>
+        <div class="fin-charts-grid">
+          <div class="fin-chart-box">
+            <h4 class="fin-chart-title">Por Plataforma</h4>
+            <canvas id="finChartPlatform" height="220"></canvas>
+          </div>
+          <div class="fin-chart-box">
+            <h4 class="fin-chart-title">Por Iniciativa</h4>
+            <canvas id="finChartInit" height="220"></canvas>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div><!-- /tab fin -->
+
+</div>
+
 </main>
+
+<!-- Modal de Criativo -->
+<!-- Modal simples: lista de leads (reuniões ou assinaturas) da Live Meta -->
+<!-- Modal: Report Diário -->
+<div id="reportModal" class="modal-overlay" hidden>
+  <div class="modal-box modal-box--report" role="dialog" aria-modal="true" aria-labelledby="reportModalTitle">
+    <div class="report-modal-header">
+      <h3 id="reportModalTitle" class="modal-title">Report Diário de Mídia Paga</h3>
+      <button class="modal-close" id="reportModalClose" aria-label="Fechar">✕</button>
+    </div>
+    <textarea id="reportTextArea" class="report-textarea" readonly spellcheck="false"></textarea>
+    <div class="report-modal-actions">
+      <button id="reportCopyBtn" class="btn btn--primary">Copiar texto</button>
+      <button id="reportSlackBtn" class="btn btn--slack">Enviar para Slack</button>
+      <span id="reportActionStatus" class="report-action-status"></span>
+    </div>
+  </div>
+</div>
+
+<div id="dealsModal" class="modal-overlay" hidden>
+  <div class="modal-box modal-box--sm" role="dialog" aria-modal="true" aria-labelledby="dealsModalTitle">
+    <button class="modal-close" id="dealsModalClose" aria-label="Fechar">✕</button>
+    <h3 id="dealsModalTitle" class="modal-title"></h3>
+    <ul id="dealsModalList" class="deals-modal-list"></ul>
+  </div>
+</div>
+
+<div id="mqlModal" class="modal-overlay" hidden>
+  <div class="modal-box modal-box--sm" role="dialog" aria-modal="true" aria-labelledby="mqlModalTitle">
+    <button class="modal-close" id="mqlModalClose" aria-label="Fechar">✕</button>
+    <h3 id="mqlModalTitle" class="modal-title">MQLs deste criativo</h3>
+    <ul id="mqlModalList" class="deals-modal-list mql-modal-list"></ul>
+  </div>
+</div>
+
+<div id="creativeModal" class="modal-overlay" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="creativeModalTitle">
+    <button class="modal-close" id="creativeModalClose" aria-label="Fechar">✕</button>
+    <div class="modal-creative-wrap" id="creativeModalImgWrap">
+      <p id="creativeModalLoading" class="modal-loading">Carregando criativo…</p>
+      <p id="creativeModalNoImg" class="modal-no-img" hidden>Criativo não disponível para este anúncio.</p>
+      <div id="creativeModalPreview"></div>
+    </div>
+    <div class="modal-ad-info">
+      <p><strong>Campanha:</strong> <span id="creativeModalCampanha"></span></p>
+      <p><strong>Conjunto:</strong> <span id="creativeModalConjunto"></span></p>
+      <p><strong>Anúncio:</strong> <span id="creativeModalAdName"></span></p>
+      <p><strong>ID do anúncio:</strong> <code id="creativeModalAdId"></code></p>
+    </div>
+  </div>
+</div>
 
 <div id="toast" class="toast"></div>
 

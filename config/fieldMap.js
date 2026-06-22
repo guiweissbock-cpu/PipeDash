@@ -1,15 +1,14 @@
 /**
  * config/fieldMap.js
- * Mapeamento dos campos customizados do Zoho CRM.
- * Edite os valores (lado direito) para corresponder aos nomes técnicos
- * dos campos no seu Zoho CRM, sem precisar alterar o restante do código.
+ * Mapeamento dos campos do Zoho CRM (Deals).
+ * Nomes técnicos verificados diretamente via API em 2026-06-16.
  */
 
 module.exports = {
   // Campos padrão
   dealName:    "Deal_Name",
   contactName: "Contact_Name",
-  leadSource:  "Lead_Source",
+  leadSource:  "Origem",
   stage:       "Stage",
   createdTime: "Created_Time",
 

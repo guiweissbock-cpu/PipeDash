@@ -1,7 +1,25 @@
+# Credenciais (nunca versionar)
 .env
 .env.local
 .env.*.local
+.env.production
+.env.staging
+credentials/
+
+# Cache com dados sensíveis (leads do Slack)
+slack_mql_cache.json
+
+# Backups locais (nunca versionar)
+backups/
+
+# Dependências
 node_modules/
+
+# Deploy / cache
 .vercel
 .DS_Store
 *.log
+dist/
+build/
+.cache/
+.turbo/
