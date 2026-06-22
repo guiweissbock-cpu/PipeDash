@@ -58,12 +58,19 @@ async function getMqlLeads(channelId = "C05G0BZ904W", limit = 200) {
         channel: channelId,
         limit:   Math.min(limit, 200),
       });
+      const allMsgs = history.messages || [];
+      let filtradas = 0, mqlSim = 0, mqlNao = 0;
       const leads = [];
-      for (const msg of (history.messages || [])) {
+      for (const msg of allMsgs) {
         const t = norm(msg.text || "");
         if (!t.includes("aula gratis") && !t.includes("rmkt")) continue;
+        filtradas++;
         const parsed    = parseLeadMessage(msg.text || "");
         const reactions = msg.reactions || [];
+        const isMql    = reactions.some(r => r.name === "white_check_mark");
+        const isNotMql = reactions.some(r => r.name === "x");
+        if (isMql)    mqlSim++;
+        if (isNotMql) mqlNao++;
         leads.push({
           ts:        msg.ts,
           nome:      parsed.nome,
@@ -73,10 +80,11 @@ async function getMqlLeads(channelId = "C05G0BZ904W", limit = 200) {
           cargo:     parsed.cargo,
           fonte:     parsed.fonte,
           fonteNorm: norm(parsed.fonte),
-          isMql:     reactions.some(r => r.name === "white_check_mark"),
-          isNotMql:  reactions.some(r => r.name === "x"),
+          isMql,
+          isNotMql,
         });
       }
+      console.log(`[Slack MQL] ${allMsgs.length} msgs lidas | ${filtradas} AULA/RMKT | ${mqlSim} ✅ MQL | ${mqlNao} ❌ não-MQL`);
       return leads;
     } catch (e) {
       console.warn("[Slack MQL] API falhou, usando cache:", e.message);

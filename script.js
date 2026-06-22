@@ -2165,10 +2165,10 @@ function renderLiveMeta(rows) {
   // Ordem canônica (por leads desc) usada para atribuição de assinaturas
   const sorted = [...rows].sort((a, b) => b.leads - a.leads);
 
-  // ── Assinaturas: mesma fonte e mesma lógica do card "Assinaturas Geradas Meta" ──
+  // ── Assinaturas: usa reunioesFiltered para respeitar o filtro de data ──
   const seenSignUid = new Set();
   const allMetaSign = [];
-  (state.reunioesRows || []).forEach(d => {
+  (state.reunioesFiltered || state.reunioesRows || []).forEach(d => {
     if (!countsAsMetaSignature(d.stage, d.origem)) return;
     const ck  = normalizeKey(d.nomeContato || "");
     const bn  = cleanDealBaseName(d.nomeNegocio);
@@ -2209,11 +2209,35 @@ function renderLiveMeta(rows) {
   const signDealsByAdId = new Map();
   sorted.forEach((r, i) => signDealsByAdId.set(r.ad_id || String(i), rowSignDeals[i]));
 
+  // ── Reuniões por criativo: mesmo matching das assinaturas, a partir de reunioesFiltered ──
+  const seenMeetUid = new Set();
+  const allMetaMeet = [];
+  (state.reunioesFiltered || state.reunioesRows || []).forEach(d => {
+    if (!countsAsMetaMeeting(d.stage, d.origem)) return;
+    const ck  = normalizeKey(d.nomeContato || "");
+    const bn  = cleanDealBaseName(d.nomeNegocio);
+    const uid = (ck && bn) ? `${ck}|${bn}` : (ck || bn || d.id || `${d.nomeNegocio}|${String(d.horaCriacao)}`);
+    if (seenMeetUid.has(uid)) return;
+    seenMeetUid.add(uid);
+    allMetaMeet.push({ ...d, _uid: uid });
+  });
+
+  const rowMeetDeals = sorted.map(() => []);
+  allMetaMeet.forEach(d => {
+    let rowIdx = -1;
+    if (d.metaAdsAnuncioKey && adNameToRowIdx.has(d.metaAdsAnuncioKey))
+      rowIdx = adNameToRowIdx.get(d.metaAdsAnuncioKey);
+    else if (d.metaAdsId && adIdToRowIdx.has(d.metaAdsId))
+      rowIdx = adIdToRowIdx.get(d.metaAdsId);
+    if (rowIdx >= 0) rowMeetDeals[rowIdx].push(d);
+  });
+
+  const meetDealsByAdId = new Map();
+  sorted.forEach((r, i) => meetDealsByAdId.set(r.ad_id || String(i), rowMeetDeals[i]));
+
   // ── Pré-computa dados de cada linha ──────────────────────────────────────────
   const rowData = sorted.map(r => {
-    const creative  = state.creatives.find(c => c.adId && c.adId === r.ad_id);
-    const allDeals  = creative ? creative.zohoDeals : [];
-    const meetDeals = allDeals.filter(d => countsAsMetaMeeting(d.stage, d.origem));
+    const meetDeals = meetDealsByAdId.get(r.ad_id || "") || [];
     const signDeals = signDealsByAdId.get(r.ad_id || "") || [];
     const mqlLeads  = getMqlForAd(r).filter(l => l.isMql);
     return { r, meetDeals, signDeals, mqlLeads };
@@ -2243,6 +2267,10 @@ function renderLiveMeta(rows) {
   const tReunioes    = rowData.reduce((s, e) => s + e.meetDeals.length, 0);
   const tAssinaturas = rowData.reduce((s, e) => s + e.signDeals.length, 0);
   const tMql         = rowData.reduce((s, e) => s + e.mqlLeads.length, 0);
+
+  const totalMqlDisp = (slackMqlState.leads || []).filter(l => l.isMql).length;
+  const semCriativo  = Math.max(0, totalMqlDisp - tMql);
+  console.log(`[Slack MQL] ${tMql} atribuídos a criativos | ${semCriativo} sem criativo | ${totalMqlDisp} total ✅`);
 
   const freq     = T.reach       > 0 ? T.impressions / T.reach        : 0;
   const cpm      = T.impressions > 0 ? T.spend / T.impressions * 1000  : 0;
@@ -2567,10 +2595,11 @@ async function fetchLiveMeta() {
 
     // Uma única chamada Zoho (deals) para todas as métricas.
     // computeReunioesReport() filtra por stage internamente.
-    const [metaRes, zohoRes, dailyRes] = await Promise.all([
+    const [metaRes, zohoRes, dailyRes, mqlRes] = await Promise.all([
       fetch(`/api/meta/live?${params}`).then((r) => r.json()),
       fetch("/api/zoho/deals").then((r) => r.json()).catch(() => ({ ok: false })),
       fetch(`/api/meta/live/daily?${params}`).then((r) => r.json()).catch(() => ({ ok: false })),
+      fetch("/api/slack/mql").then((r) => r.json()).catch(() => ({ ok: false, data: [] })),
     ]);
 
     if (!metaRes.ok) throw new Error(metaRes.error || "Erro desconhecido");
@@ -2612,6 +2641,18 @@ async function fetchLiveMeta() {
     _lmDailyData    = (dailyRes.ok && Array.isArray(dailyRes.data)) ? dailyRes.data : [];
     _lmCurrentPeriod = { preset, since: document.getElementById("liveMetaSince").value, until: document.getElementById("liveMetaUntil").value };
 
+    // MQL — carrega antes de renderLiveMeta para que getMqlForAd() tenha os dados
+    if (mqlRes.ok && Array.isArray(mqlRes.data)) {
+      const total    = mqlRes.data.length;
+      const aulaRmkt = mqlRes.data.filter(l => { const f = (l.fonte || "").toLowerCase(); return f.includes("aula") || f.includes("rmkt"); }).length;
+      const comCheck = mqlRes.data.filter(l => l.isMql).length;
+      const comX     = mqlRes.data.filter(l => l.isNotMql).length;
+      console.log(`[Slack MQL] ${total} msgs lidas | ${aulaRmkt} AULA/RMKT | ${comCheck} ✅ MQL | ${comX} ❌ não-MQL`);
+      slackMqlState.leads = mqlRes.data;
+    } else {
+      console.warn("[Slack MQL] Não carregado:", mqlRes.error || "resposta inválida");
+    }
+
     renderLiveMetaMetrics({ metaTotal, reunioes, assinaturas });
     renderLiveMeta(metaRes.data || []);
     renderLmDailyToggles();
@@ -2634,10 +2675,71 @@ async function fetchLiveMeta() {
 
 document.getElementById("liveMetaRefreshBtn").addEventListener("click", fetchLiveMeta);
 
+// Quando preset muda, preenche automaticamente as datas para referência visual
 document.getElementById("liveMetaPreset").addEventListener("change", (e) => {
-  document.getElementById("liveMetaCustomDates").style.display =
-    e.target.value === "custom" ? "flex" : "none";
+  const preset = e.target.value;
+  if (preset !== "custom") {
+    const { start, end } = presetToDateRange(preset, "", "");
+    document.getElementById("liveMetaSince").value = _lmDateKey(start);
+    document.getElementById("liveMetaUntil").value = _lmDateKey(end);
+  }
 });
+
+// Aplicar filtro: re-filtra dados em memória e re-renderiza toda a aba Live Meta
+function applyLmFilter() {
+  const hasReunioesData = (state.reunioesRows || []).length > 0;
+  const hasLmRows       = (_liveMetaRows || []).length > 0;
+  if (!hasReunioesData && !hasLmRows) {
+    showToast("Carregue os dados primeiro clicando em \"Atualizar Dados\".", "error");
+    return;
+  }
+
+  const preset = document.getElementById("liveMetaPreset").value;
+  const since  = document.getElementById("liveMetaSince").value;
+  const until  = document.getElementById("liveMetaUntil").value;
+  if (!since || !until) {
+    showToast("Selecione Data início e Data fim.", "error");
+    return;
+  }
+
+  const dateRange = presetToDateRange("custom", since, until);
+  const filterByPeriod = (rows) => rows.filter((d) => {
+    if (!d.horaCriacao) return false;
+    return d.horaCriacao >= dateRange.start && d.horaCriacao <= dateRange.end;
+  });
+
+  // Re-filtra Zoho pelo período selecionado
+  state.reunioesFiltered = filterByPeriod(state.reunioesRows);
+  const zohoFiltered     = filterByPeriod(state.zohoRows);
+
+  // Recalcula cards
+  const { reunioes, assinaturas } = computeReunioesReport(state.reunioesFiltered);
+  const { metaTotal }             = computeZohoMetaMetrics(zohoFiltered);
+  renderLiveMetaMetrics({ metaTotal, reunioes, assinaturas });
+
+  // Atualiza período do gráfico e re-renderiza
+  _lmCurrentPeriod = { preset: "custom", since, until };
+  renderLmDailyToggles();
+  renderLmDailyChart();
+
+  // Re-renderiza tabela com novos filtros Zoho + MQL
+  renderLiveMeta(_liveMetaRows);
+}
+
+document.getElementById("lmApplyFilterBtn").addEventListener("click", applyLmFilter);
+document.getElementById("liveMetaSince").addEventListener("change", () => {
+  document.getElementById("liveMetaPreset").value = "custom";
+});
+document.getElementById("liveMetaUntil").addEventListener("change", () => {
+  document.getElementById("liveMetaPreset").value = "custom";
+});
+
+// Pré-preenche as datas com o preset padrão ao carregar a página
+(function initLmDates() {
+  const { start, end } = presetToDateRange("last_30d", "", "");
+  document.getElementById("liveMetaSince").value = _lmDateKey(start);
+  document.getElementById("liveMetaUntil").value = _lmDateKey(end);
+})();
 
 /* ---------- Navegação por abas ---------- */
 document.querySelectorAll(".tab-btn").forEach((btn) => {

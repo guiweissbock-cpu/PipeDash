@@ -342,7 +342,7 @@
             <option value="custom">Período personalizado</option>
           </select>
         </div>
-        <div id="liveMetaCustomDates" class="livemeta-custom-dates" style="display:none">
+        <div class="livemeta-custom-dates">
           <div class="filter-field">
             <label for="liveMetaSince">Data início</label>
             <input type="date" id="liveMetaSince" />
@@ -353,6 +353,7 @@
           </div>
         </div>
         <div class="api-actions">
+          <button id="lmApplyFilterBtn" class="btn btn--secondary">Aplicar filtro</button>
           <button id="liveMetaRefreshBtn" class="btn btn--primary">Atualizar Dados</button>
           <span id="liveMetaStatus" class="process-status"></span>
         </div>
