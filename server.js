@@ -555,6 +555,56 @@ app.get("/api/keyword-planner/ia/test", async (req, res) => {
   }
 });
 
+// ── GET /api/figma/test ───────────────────────────────────────────────────────
+// Valida o token Figma chamando /me. Não expõe o token em nenhum caso.
+app.get("/api/figma/test", async (req, res) => {
+  try {
+    if (!process.env.FIGMA_ACCESS_TOKEN) {
+      return res.status(500).json({ ok: false, error: "FIGMA_ACCESS_TOKEN não configurado no .env" });
+    }
+    const figmaService = require("./services/figmaService");
+    const result = await figmaService.testConnection();
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error("[Figma Test]", err.message);
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
+// ── GET /api/figma/file ───────────────────────────────────────────────────────
+// Retorna metadados do arquivo: nome, data, páginas e frames.
+// Query param opcional: fileKey (usa FIGMA_FILE_KEY do .env como padrão).
+app.get("/api/figma/file", async (req, res) => {
+  try {
+    if (!process.env.FIGMA_ACCESS_TOKEN) {
+      return res.status(500).json({ ok: false, error: "FIGMA_ACCESS_TOKEN não configurado no .env" });
+    }
+    const figmaService = require("./services/figmaService");
+    const data = await figmaService.getFile(req.query.fileKey);
+    res.json({ ok: true, data });
+  } catch (err) {
+    console.error("[Figma File]", err.message);
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
+// ── GET /api/figma/frames ─────────────────────────────────────────────────────
+// Lista frames (templates) do arquivo com id, nome, página e dimensões.
+// Query param opcional: fileKey (usa FIGMA_FILE_KEY do .env como padrão).
+app.get("/api/figma/frames", async (req, res) => {
+  try {
+    if (!process.env.FIGMA_ACCESS_TOKEN) {
+      return res.status(500).json({ ok: false, error: "FIGMA_ACCESS_TOKEN não configurado no .env" });
+    }
+    const figmaService = require("./services/figmaService");
+    const frames = await figmaService.getFrames(req.query.fileKey);
+    res.json({ ok: true, count: frames.length, data: frames });
+  } catch (err) {
+    console.error("[Figma Frames]", err.message);
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
 // ── GET /api/status ───────────────────────────────────────────────────────────
 // Verifica quais integrações estão configuradas (sem expor os valores).
 app.get("/api/status", (_req, res) => {
@@ -568,6 +618,7 @@ app.get("/api/status", (_req, res) => {
     slack:      hasSlack,
     google:     !!(process.env.GOOGLE_ADS_REFRESH_TOKEN && process.env.GOOGLE_ADS_CUSTOMER_ID),
     googleMcc:  !!(process.env.GOOGLE_ADS_MCC_ID || process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID),
+    figma:      !!(process.env.FIGMA_ACCESS_TOKEN && process.env.FIGMA_FILE_KEY),
   });
 });
 
@@ -575,5 +626,6 @@ app.listen(PORT, () => {
   console.log(`\n✅ Dashboard rodando em http://localhost:${PORT}`);
   console.log(`   Meta:  ${process.env.META_ACCESS_TOKEN ? "✓ configurado" : "✗ META_ACCESS_TOKEN ausente"}`);
   console.log(`   Zoho:  ${process.env.ZOHO_REFRESH_TOKEN ? "✓ configurado" : "✗ ZOHO_REFRESH_TOKEN ausente"}`);
-  console.log(`   Slack: ${process.env.SLACK_WEBHOOK_URL ? "✓ configurado" : "✗ SLACK_WEBHOOK_URL ausente"}\n`);
+  console.log(`   Slack: ${process.env.SLACK_WEBHOOK_URL ? "✓ configurado" : "✗ SLACK_WEBHOOK_URL ausente"}`);
+  console.log(`   Figma: ${process.env.FIGMA_ACCESS_TOKEN ? "✓ configurado" : "✗ FIGMA_ACCESS_TOKEN ausente"}\n`);
 });
