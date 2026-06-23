@@ -105,7 +105,7 @@ const cs = (() => {
             <div class="cs-template-name">${esc(f.name)}</div>
             <div class="cs-template-meta">${esc(f.page)} · ${size}</div>
           </div>
-          <button class="btn btn--ghost btn--sm cs-use-btn" tabindex="-1">Usar</button>
+          <button class="btn btn--secondary btn--sm cs-use-btn" tabindex="-1">Usar</button>
         </div>`;
     }).join("");
 
@@ -357,10 +357,22 @@ const cs = (() => {
 
   // ── Image upload modal ─────────────────────────────────────────────────────
 
+  const IMAGE_MODAL_META = {
+    logos:           { title: "Subir logo",                   accept: "image/png,image/svg+xml,image/jpeg,.png,.svg,.jpg,.jpeg" },
+    pagotto:         { title: "Subir imagem do Pagotto/CEO",  accept: "image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" },
+    refPipelovers:   { title: "Subir referência PipeLovers",  accept: "image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" },
+    refConcorrentes: { title: "Subir referência concorrente", accept: "image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" },
+  };
+
   function openImageModal(cat) {
     _activeImageCat = cat;
+    const meta  = IMAGE_MODAL_META[cat] || { title: "Subir imagem", accept: "image/*" };
+    const title = $i("csImageModalTitle");
+    const input = $i("csImageModalFileInput");
+    if (title) title.textContent = meta.title;
+    if (input) input.accept      = meta.accept;
     $i("csImageModalName").value        = "";
-    $i("csImageModalFileInput").value   = "";
+    if (input) input.value              = "";
     $i("csImageModalPreview").innerHTML = "";
     $i("csImageModalObs").value         = "";
     $i("csImageModal").hidden           = false;

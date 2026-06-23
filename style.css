@@ -338,6 +338,19 @@ body.tab-cs-active .layout { max-width: 100%; padding: 0; }
   gap: 8px;
 }
 
+/* btn--ghost está definido para a topbar escura (texto #fff); na aba
+   Creative Studio (fundo branco) esse texto ficaria invisível — corrige aqui */
+.tab-panel[data-tab="cs"] .btn--ghost {
+  color: var(--accent);
+  background: transparent;
+  border-color: rgba(108, 92, 231, 0.35);
+}
+.tab-panel[data-tab="cs"] .btn--ghost:hover:not(:disabled) {
+  background: rgba(108, 92, 231, 0.08);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .cs-section-title {
   font-size: 0.875rem;
   font-weight: 600;
