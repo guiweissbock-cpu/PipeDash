@@ -5,19 +5,34 @@
 const cs = (() => {
 
   // ── State ───────────────────────────────────────────────────────────────────
-  let _frames        = [];
-  let _selectedFrame = null;
-  let _selectedAsset = null;
-  let _assets        = [];
-  let _suggestions   = null;
-  let _variations    = [];
-  let _history       = [];
+  let _frames         = [];
+  let _selectedFrame  = null;
+  let _selectedAsset  = null;
+  let _library        = { logos:[], pagotto:[], cores:[], fontes:[], refPipelovers:[], refConcorrentes:[] };
+  let _suggestions    = null;
+  let _variations     = [];
+  let _history        = [];
+  let _activeImageCat = null;
 
-  const LS_ASSETS  = "cs_assets_v1";
   const LS_HISTORY = "cs_history_v1";
 
-  const ASSET_ICONS  = { ceo:"🧑‍💼", logo:"🏷️", background:"🖼️", mockup:"📱", icon:"✦" };
-  const ASSET_LABELS = { ceo:"Foto CEO", logo:"Logo", background:"Fundo", mockup:"Mockup", icon:"Ícone" };
+  const LIB_KEYS = {
+    logos:           "cs_lib_logos_v1",
+    pagotto:         "cs_lib_pagotto_v1",
+    cores:           "cs_lib_cores_v1",
+    fontes:          "cs_lib_fontes_v1",
+    refPipelovers:   "cs_lib_refpipelovers_v1",
+    refConcorrentes: "cs_lib_refconcorrentes_v1",
+  };
+
+  const LIB_LIST = {
+    logos:           "csLogosList",
+    pagotto:         "csPagottoList",
+    cores:           "csCoresList",
+    fontes:          "csFontesList",
+    refPipelovers:   "csRefPlList",
+    refConcorrentes: "csRefConcList",
+  };
 
   function $i(id) { return document.getElementById(id); }
   function esc(s) {
@@ -251,83 +266,197 @@ const cs = (() => {
     _suggestions = insights;
   }
 
-  // ── Module 4: Biblioteca de Assets ─────────────────────────────────────────
+  // ── Module 4: Biblioteca de Assets (6 categorias) ─────────────────────────
 
-  function loadAssets() {
-    try { _assets = JSON.parse(localStorage.getItem(LS_ASSETS) || "[]"); }
-    catch (_) { _assets = []; }
+  function loadLibrary() {
+    Object.keys(LIB_KEYS).forEach(cat => {
+      try { _library[cat] = JSON.parse(localStorage.getItem(LIB_KEYS[cat]) || "[]"); }
+      catch (_) { _library[cat] = []; }
+    });
   }
 
-  function saveAssets() {
-    try { localStorage.setItem(LS_ASSETS, JSON.stringify(_assets)); } catch (_) {}
+  function saveLibraryCat(cat) {
+    try { localStorage.setItem(LIB_KEYS[cat], JSON.stringify(_library[cat])); } catch (_) {}
   }
 
-  function renderAssets() {
-    const list = $i("csAssetsList");
+  function renderCategory(cat) {
+    const list = $i(LIB_LIST[cat]);
     if (!list) return;
-    if (!_assets.length) {
-      list.innerHTML = `<p class="cs-placeholder" style="grid-column:1/-1">Nenhum asset cadastrado.</p>`;
+    const items = _library[cat];
+
+    if (!items.length) {
+      list.innerHTML = `<p class="cs-lib-empty">Nenhum item cadastrado.</p>`;
       return;
     }
-    list.innerHTML = _assets.map((a, i) => {
-      const icon = ASSET_ICONS[a.type] || "📎";
-      const img  = a.url
-        ? `<img src="${esc(a.url)}" alt="${esc(a.name)}" loading="lazy" onerror="this.parentElement.innerHTML='${icon}'">`
-        : icon;
-      const selStyle = _selectedAsset?.id === a.id ? "border-color:var(--accent);" : "";
-      return `
-        <div class="cs-asset-card" style="${selStyle}">
-          <div class="cs-asset-preview">${img}</div>
-          <div class="cs-asset-name" title="${esc(a.name)}">${esc(a.name)}</div>
-          <div class="cs-asset-type">${esc(ASSET_LABELS[a.type] || a.type)}</div>
-          <div class="cs-asset-actions">
-            <button class="cs-asset-use-btn" data-idx="${i}">Usar</button>
-            <button class="cs-asset-del-btn" data-idx="${i}">✕</button>
+
+    if (cat === "cores") {
+      list.innerHTML = items.map((c, i) => `
+        <div class="cs-color-swatch">
+          <div class="cs-color-square" style="background:${esc(c.hex)}"></div>
+          <div class="cs-color-info">
+            <div class="cs-color-name">${esc(c.name)}</div>
+            <div class="cs-color-hex">${esc(c.hex)}</div>
+            ${c.uso ? `<div class="cs-color-uso">${esc(c.uso)}</div>` : ""}
           </div>
-        </div>`;
-    }).join("");
+          <button class="cs-lib-del-btn" data-cat="${cat}" data-idx="${i}" title="Remover">✕</button>
+        </div>`).join("");
 
-    list.querySelectorAll(".cs-asset-use-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        _selectedAsset = _assets[parseInt(btn.dataset.idx)];
-        renderAssets();
+    } else if (cat === "fontes") {
+      list.innerHTML = items.map((f, i) => `
+        <div class="cs-font-card">
+          <div class="cs-font-preview" style="font-family:'${esc(f.name)}',sans-serif;font-weight:${esc(f.peso || "400")}">Aa</div>
+          <div class="cs-font-info">
+            <div class="cs-font-name">${esc(f.name)}</div>
+            <div class="cs-font-meta">${f.peso ? `Peso ${esc(f.peso)}` : ""}${f.uso ? ` · ${esc(f.uso)}` : ""}</div>
+          </div>
+          <button class="cs-lib-del-btn" data-cat="${cat}" data-idx="${i}" title="Remover">✕</button>
+        </div>`).join("");
+
+    } else {
+      const selId = _selectedAsset?.id;
+      list.innerHTML = items.map((a, i) => {
+        const sel = selId === a.id ? " cs-lib-img--selected" : "";
+        return `
+          <div class="cs-lib-img-card${sel}">
+            <div class="cs-lib-img-preview">
+              ${a.preview
+                ? `<img src="${esc(a.preview)}" alt="${esc(a.name)}" loading="lazy">`
+                : `<span class="cs-lib-img-icon">🖼️</span>`}
+            </div>
+            <div class="cs-lib-img-name" title="${esc(a.name)}">${esc(a.name)}</div>
+            <div class="cs-lib-img-actions">
+              <button class="cs-lib-use-btn" data-cat="${cat}" data-idx="${i}">Usar</button>
+              <button class="cs-lib-del-btn" data-cat="${cat}" data-idx="${i}">✕</button>
+            </div>
+          </div>`;
+      }).join("");
+
+      list.querySelectorAll(".cs-lib-use-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          _selectedAsset = _library[btn.dataset.cat]?.[parseInt(btn.dataset.idx)] || null;
+          renderCategory(cat);
+        });
       });
-    });
-    list.querySelectorAll(".cs-asset-del-btn").forEach(btn => {
+    }
+
+    list.querySelectorAll(".cs-lib-del-btn").forEach(btn => {
       btn.addEventListener("click", () => {
+        const c   = btn.dataset.cat;
         const idx = parseInt(btn.dataset.idx);
-        if (_selectedAsset?.id === _assets[idx]?.id) _selectedAsset = null;
-        _assets.splice(idx, 1);
-        saveAssets();
-        renderAssets();
+        if (_selectedAsset?.id === _library[c]?.[idx]?.id) _selectedAsset = null;
+        _library[c].splice(idx, 1);
+        saveLibraryCat(c);
+        renderCategory(c);
       });
     });
   }
 
-  function openAssetModal() {
-    $i("csAssetModalName").value = "";
-    $i("csAssetModalType").value = "ceo";
-    $i("csAssetModalUrl").value  = "";
-    $i("csAssetModal").hidden = false;
-    $i("csAssetModalName").focus();
+  function renderAllCategories() {
+    Object.keys(LIB_LIST).forEach(cat => renderCategory(cat));
   }
 
-  function closeAssetModal() {
-    $i("csAssetModal").hidden = true;
+  // ── Image upload modal ─────────────────────────────────────────────────────
+
+  function openImageModal(cat) {
+    _activeImageCat = cat;
+    $i("csImageModalName").value        = "";
+    $i("csImageModalFileInput").value   = "";
+    $i("csImageModalPreview").innerHTML = "";
+    $i("csImageModalObs").value         = "";
+    $i("csImageModal").hidden           = false;
+    $i("csImageModalName").focus();
   }
 
-  function saveAssetFromModal() {
-    const name = ($i("csAssetModalName")?.value || "").trim();
-    if (!name) { $i("csAssetModalName")?.focus(); return; }
-    _assets.push({
-      id:   Date.now().toString(),
+  function closeImageModal() {
+    $i("csImageModal").hidden = true;
+    _activeImageCat = null;
+  }
+
+  function saveFromImageModal() {
+    const cat  = _activeImageCat;
+    if (!cat) return;
+    const name = ($i("csImageModalName")?.value || "").trim();
+    if (!name) { $i("csImageModalName")?.focus(); return; }
+    const file = $i("csImageModalFileInput")?.files?.[0];
+    const obs  = ($i("csImageModalObs")?.value  || "").trim();
+
+    const finish = (preview) => {
+      _library[cat].push({
+        id:        Date.now().toString(),
+        name,
+        cat,
+        preview:   preview || null,
+        obs,
+        timestamp: Date.now(),
+      });
+      saveLibraryCat(cat);
+      renderCategory(cat);
+      closeImageModal();
+    };
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = e => finish(e.target.result);
+      reader.readAsDataURL(file);
+    } else {
+      finish(null);
+    }
+  }
+
+  // ── Color modal ────────────────────────────────────────────────────────────
+
+  function openColorModal() {
+    $i("csColorModalName").value    = "";
+    $i("csColorModalHex").value     = "#ff6b00";
+    $i("csColorModalHexText").value = "#ff6b00";
+    $i("csColorModalUso").value     = "";
+    $i("csColorModal").hidden       = false;
+    $i("csColorModalName").focus();
+  }
+
+  function closeColorModal() { $i("csColorModal").hidden = true; }
+
+  function saveFromColorModal() {
+    const name = ($i("csColorModalName")?.value    || "").trim();
+    const hex  = ($i("csColorModalHexText")?.value || $i("csColorModalHex")?.value || "").trim();
+    if (!name) { $i("csColorModalName")?.focus(); return; }
+    _library.cores.push({
+      id:        Date.now().toString(),
       name,
-      type: $i("csAssetModalType")?.value || "icon",
-      url:  ($i("csAssetModalUrl")?.value || "").trim(),
+      hex,
+      uso:       ($i("csColorModalUso")?.value || "").trim(),
+      timestamp: Date.now(),
     });
-    saveAssets();
-    renderAssets();
-    closeAssetModal();
+    saveLibraryCat("cores");
+    renderCategory("cores");
+    closeColorModal();
+  }
+
+  // ── Font modal ─────────────────────────────────────────────────────────────
+
+  function openFontModal() {
+    $i("csFontModalName").value = "";
+    $i("csFontModalPeso").value = "";
+    $i("csFontModalUso").value  = "";
+    $i("csFontModal").hidden    = false;
+    $i("csFontModalName").focus();
+  }
+
+  function closeFontModal() { $i("csFontModal").hidden = true; }
+
+  function saveFromFontModal() {
+    const name = ($i("csFontModalName")?.value || "").trim();
+    if (!name) { $i("csFontModalName")?.focus(); return; }
+    _library.fontes.push({
+      id:        Date.now().toString(),
+      name,
+      peso:      ($i("csFontModalPeso")?.value || "").trim(),
+      uso:       ($i("csFontModalUso")?.value  || "").trim(),
+      timestamp: Date.now(),
+    });
+    saveLibraryCat("fontes");
+    renderCategory("fontes");
+    closeFontModal();
   }
 
   // ── Module 5: Gerar Variações ───────────────────────────────────────────────
@@ -412,8 +541,8 @@ const cs = (() => {
       cta:           a.cta(briefing),
       template:      _selectedFrame?.name || "(sem template)",
       templateId:    _selectedFrame?.id   || null,
-      asset:         _selectedAsset?.name || "(sem asset)",
-      assetUrl:      _selectedAsset?.url  || null,
+      asset:         _selectedAsset?.name    || "(sem asset)",
+      assetUrl:      _selectedAsset?.preview || _selectedAsset?.url || null,
       publico:       briefing.publico,
       oferta:        briefing.oferta,
       obs:           briefing.obs,
@@ -605,17 +734,14 @@ const cs = (() => {
   // ── Init ────────────────────────────────────────────────────────────────────
 
   function init() {
-    loadAssets();
+    loadLibrary();
     loadHistory();
-    renderAssets();
+    renderAllCategories();
     renderHistory();
 
     $i("csLoadFramesBtn")     ?.addEventListener("click", loadFrames);
     $i("csGenSuggestionsBtn") ?.addEventListener("click", () => renderSuggestions(extractInsights()));
     $i("csGenVariationsBtn")  ?.addEventListener("click", generateVariations);
-    $i("csAddAssetBtn")       ?.addEventListener("click", openAssetModal);
-    $i("csAssetCancelBtn")    ?.addEventListener("click", closeAssetModal);
-    $i("csAssetSaveBtn")      ?.addEventListener("click", saveAssetFromModal);
     $i("csClearHistoryBtn")   ?.addEventListener("click", clearHistory);
     $i("csDeselectBtn")       ?.addEventListener("click", () => {
       _selectedFrame = null;
@@ -623,13 +749,61 @@ const cs = (() => {
       renderFrames();
     });
 
-    const modal = $i("csAssetModal");
-    if (modal) modal.addEventListener("click", e => { if (e.target === modal) closeAssetModal(); });
+    // Botões de categoria
+    $i("csAddLogoBtn")    ?.addEventListener("click", () => openImageModal("logos"));
+    $i("csAddPagottoBtn") ?.addEventListener("click", () => openImageModal("pagotto"));
+    $i("csAddCorBtn")     ?.addEventListener("click", openColorModal);
+    $i("csAddFonteBtn")   ?.addEventListener("click", openFontModal);
+    $i("csAddRefPlBtn")   ?.addEventListener("click", () => openImageModal("refPipelovers"));
+    $i("csAddRefConcBtn") ?.addEventListener("click", () => openImageModal("refConcorrentes"));
 
-    // Enter no modal salva
-    $i("csAssetModalUrl")?.addEventListener("keydown", e => { if (e.key === "Enter") saveAssetFromModal(); });
+    // Modal de imagem
+    $i("csImageModalCancelBtn")?.addEventListener("click", closeImageModal);
+    $i("csImageModalSaveBtn")  ?.addEventListener("click", saveFromImageModal);
+    const imgModal = $i("csImageModal");
+    if (imgModal) imgModal.addEventListener("click", e => { if (e.target === imgModal) closeImageModal(); });
 
-    // Carrega frames automaticamente se Figma estiver configurado
+    $i("csImageModalFileInput")?.addEventListener("change", () => {
+      const file = $i("csImageModalFileInput")?.files?.[0];
+      const prev = $i("csImageModalPreview");
+      if (!prev) return;
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = e => { prev.innerHTML = `<img src="${e.target.result}" style="max-width:100%;max-height:100px;border-radius:4px">`; };
+        reader.readAsDataURL(file);
+      } else {
+        prev.innerHTML = "";
+      }
+    });
+    $i("csImageModalObs")?.addEventListener("keydown", e => { if (e.key === "Enter") saveFromImageModal(); });
+
+    // Modal de cor
+    $i("csColorModalCancelBtn")?.addEventListener("click", closeColorModal);
+    $i("csColorModalSaveBtn")  ?.addEventListener("click", saveFromColorModal);
+    const colorModal = $i("csColorModal");
+    if (colorModal) colorModal.addEventListener("click", e => { if (e.target === colorModal) closeColorModal(); });
+
+    $i("csColorModalHex")?.addEventListener("input", e => {
+      const txt = $i("csColorModalHexText");
+      if (txt) txt.value = e.target.value;
+    });
+    $i("csColorModalHexText")?.addEventListener("input", e => {
+      const v = e.target.value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+        const picker = $i("csColorModalHex");
+        if (picker) picker.value = v;
+      }
+    });
+    $i("csColorModalUso")?.addEventListener("keydown", e => { if (e.key === "Enter") saveFromColorModal(); });
+
+    // Modal de fonte
+    $i("csFontModalCancelBtn")?.addEventListener("click", closeFontModal);
+    $i("csFontModalSaveBtn")  ?.addEventListener("click", saveFromFontModal);
+    const fontModal = $i("csFontModal");
+    if (fontModal) fontModal.addEventListener("click", e => { if (e.target === fontModal) closeFontModal(); });
+    $i("csFontModalUso")?.addEventListener("keydown", e => { if (e.key === "Enter") saveFromFontModal(); });
+
+    // Auto-load frames se Figma estiver configurado
     fetch("/api/status").then(r => r.json()).then(s => {
       if (s.figma && !_frames.length) loadFrames();
     }).catch(() => {});

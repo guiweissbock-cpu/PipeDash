@@ -447,6 +447,134 @@ body.tab-cs-active .layout { max-width: 100%; padding: 0; }
 .cs-asset-use-btn:hover { border-color: var(--accent); color: var(--accent); }
 .cs-asset-del-btn:hover { border-color: var(--danger); color: var(--danger); }
 
+/* ── Library Categories (v2.4.0) ─────────────────────────────────────────── */
+.cs-library-section { padding-bottom: 4px; }
+
+.cs-lib-category {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.cs-lib-category:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+.cs-lib-cat-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cs-lib-cat-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.cs-lib-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 2px 0;
+  font-style: italic;
+}
+
+/* Image cards */
+.cs-lib-list--images { display: flex; flex-wrap: wrap; gap: 6px; }
+.cs-lib-img-card {
+  width: 68px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg);
+  transition: border-color 0.12s;
+}
+.cs-lib-img-card:hover { border-color: var(--accent); }
+.cs-lib-img--selected { border-color: var(--accent) !important; outline: 2px solid rgba(108,92,231,0.2); }
+.cs-lib-img-preview {
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.cs-lib-img-preview img { width: 100%; height: 100%; object-fit: cover; }
+.cs-lib-img-icon { font-size: 20px; }
+.cs-lib-img-name { font-size: 9px; color: var(--text-muted); padding: 2px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cs-lib-img-actions { display: flex; border-top: 1px solid var(--border); }
+.cs-lib-use-btn,
+.cs-lib-del-btn {
+  flex: 1;
+  padding: 3px 0;
+  font-size: 9px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: color 0.12s, background 0.12s;
+}
+.cs-lib-img-actions .cs-lib-use-btn { border-right: 1px solid var(--border); }
+.cs-lib-use-btn:hover { color: var(--accent); }
+.cs-lib-del-btn:hover { color: var(--danger); }
+
+/* Color swatches */
+.cs-lib-list--cores { display: flex; flex-direction: column; gap: 6px; }
+.cs-color-swatch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.cs-color-square {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,0.15);
+}
+.cs-color-info { flex: 1; min-width: 0; }
+.cs-color-name { font-size: 11px; font-weight: 600; color: var(--text-primary); }
+.cs-color-hex  { font-size: 10px; color: var(--text-muted); font-family: monospace; letter-spacing: 0.04em; }
+.cs-color-uso  { font-size: 10px; color: var(--text-muted); }
+.cs-color-swatch .cs-lib-del-btn,
+.cs-font-card   .cs-lib-del-btn {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Font cards */
+.cs-lib-list--fonts { display: flex; flex-direction: column; gap: 6px; }
+.cs-font-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.cs-font-preview {
+  font-size: 24px;
+  color: var(--text-primary);
+  width: 36px;
+  text-align: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.cs-font-info { flex: 1; min-width: 0; }
+.cs-font-name { font-size: 11px; font-weight: 600; color: var(--text-primary); }
+.cs-font-meta { font-size: 10px; color: var(--text-muted); }
+
 /* ── Selected Banner ───────────────────────────────────────────────────────── */
 .cs-selected-banner {
   display: flex;
