@@ -306,6 +306,7 @@ tbody tr:hover { background: rgba(108, 92, 231, 0.05); }
 .toast.toast--info { border-color: rgba(108, 92, 231, 0.5); color: var(--accent-strong); }
 
 .footer { text-align: center; padding: 24px; color: var(--text-muted); font-size: 12px; }
+.footer-version { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 10px; background: var(--bg-card); border: 1px solid var(--border); font-size: 11px; color: var(--text-muted); letter-spacing: 0.03em; }
 
 /* ── Live Meta ──────────────────────────────────────────────────────────────── */
 .livemeta-header { padding: 16px 24px 12px; }
@@ -1796,4 +1797,299 @@ body.tab-fin-active .layout {
   .fin-charts-grid { grid-template-columns: 1fr; }
   .fin-summary-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   body.tab-fin-active .layout { padding: 0 12px; }
+}
+
+/* =============================================================================
+   KEYWORD PLANNER IA
+   ============================================================================= */
+
+/* Layout do formulário */
+.kwia-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.kwia-form-col { display: flex; flex-direction: column; }
+.kwia-form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.kwia-form-row .filter-field { flex: 1; min-width: 130px; }
+
+textarea#kwiaSeeds,
+textarea#kwiaProducts {
+  width: 100%;
+  resize: vertical;
+  font-size: .85rem;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-primary);
+  line-height: 1.5;
+  font-family: inherit;
+}
+textarea#kwiaSeeds:focus,
+textarea#kwiaProducts:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.12);
+}
+
+/* Badges */
+.kwia-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 700;
+}
+.kwia-badge--running  { background: #e8f4fd; color: #1a6db5; }
+.kwia-badge--done     { background: var(--green-soft); color: var(--green); }
+.kwia-badge--viable   { background: var(--green-soft); color: var(--green); }
+.kwia-badge--close    { background: #fef9e7; color: #b8860b; }
+.kwia-badge--bad      { background: #fde8e8; color: var(--danger); }
+
+/* Barra de progresso */
+.kwia-progress-bar-wrap {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.kwia-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--green));
+  border-radius: 3px;
+  transition: width .4s ease;
+}
+
+/* Grid de stats do progresso */
+.kwia-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.kwia-progress-stat {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kwia-progress-label { font-size: .72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.kwia-progress-value { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+.kwia-progress-value--sm { font-size: .85rem; }
+
+/* Log de tentativas */
+.kwia-attempt-log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.kwia-attempt-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: .8rem;
+}
+.kwia-attempt-row .kwia-att-num  { font-weight: 700; color: var(--accent); min-width: 22px; }
+.kwia-attempt-row .kwia-att-name { color: var(--text-secondary); flex: 1; }
+.kwia-attempt-row .kwia-att-stat { color: var(--text-muted); font-size: .75rem; }
+.kwia-attempt-row .kwia-att-ok   { color: var(--green); font-weight: 700; }
+.kwia-attempt-row .kwia-att-err  { color: var(--danger); }
+
+/* Cards do melhor plano */
+.kwia-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.kwia-plan-card {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kwia-plan-card__label { font-size: .72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.kwia-plan-card__value { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+.kwia-plan-card--accent .kwia-plan-card__value { color: var(--accent); }
+.kwia-plan-card--green  .kwia-plan-card__value { color: var(--green); }
+
+/* Recomendação */
+.kwia-recommendation {
+  background: var(--bg);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+  font-size: .88rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* Simulador */
+.kwia-sim-grid {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.kwia-sim-grid .filter-field { flex: 1; min-width: 140px; }
+.kwia-sim-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.kwia-sim-card {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.kwia-sim-card__label { font-size: .72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
+.kwia-sim-card__value { font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 4px; }
+
+/* Tabela */
+#kwiaTable thead th { font-size: .72rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap; }
+#kwiaTable tbody tr:hover { background: var(--bg); }
+#kwiaTable tbody td   { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
+
+.kwia-intent-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
+}
+.kwia-intent--Dor      { background: #fde8e8; color: #c0392b; }
+.kwia-intent--Desejo   { background: #e8f0fe; color: #1a5dc9; }
+.kwia-intent--Solução  { background: var(--green-soft); color: #148a5e; }
+.kwia-intent--Marca    { background: #f0e8ff; color: var(--accent-strong); }
+.kwia-intent--Genérica { background: var(--bg); color: var(--text-muted); }
+
+.kwia-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: .70rem;
+  font-weight: 600;
+}
+.kwia-status--Nova        { background: var(--green-soft); color: var(--green); }
+.kwia-status--exist       { background: #fef9e7; color: #a07a00; }
+.kwia-status--bad         { background: #fde8e8; color: var(--danger); }
+
+/* Histórico */
+.kwia-history-list { display: flex; flex-direction: column; gap: 10px; }
+.kwia-history-item {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.kwia-history-item__meta { flex: 1; min-width: 200px; }
+.kwia-history-item__name { font-size: .9rem; font-weight: 700; }
+.kwia-history-item__details { font-size: .78rem; color: var(--text-muted); margin-top: 3px; }
+.kwia-history-item__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Secondary button no modo claro */
+.btn--secondary {
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+.btn--secondary:not(:disabled):hover { background: var(--border); }
+
+/* ── Intent Checkbox Group ──────────────────────────────────────────────── */
+.kwia-intent-group {
+  display: flex; flex-wrap: wrap; gap: 6px 14px;
+  padding: 8px 10px; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--bg-card);
+}
+.kwia-intent-check-label {
+  display: flex; align-items: center; gap: 5px;
+  font-size: .82rem; color: var(--text); cursor: pointer;
+  user-select: none; white-space: nowrap;
+}
+.kwia-intent-check-label input[type="checkbox"] { cursor: pointer; accent-color: var(--accent); }
+.kwia-intent-check-label:hover { color: var(--accent); }
+.filter-field--full { flex: 1 1 100%; min-width: 100%; }
+
+/* Intent badge colors — new taxonomy */
+.kwia-intent--Fundo-de-funil    { background:#fef2f2; color:#991b1b; border-color:#fecaca; }
+.kwia-intent--Problema-Dor      { background:#fff7ed; color:#c2410c; border-color:#fed7aa; }
+.kwia-intent--Curso-Treinamento { background:#f0fdf4; color:#15803d; border-color:#bbf7d0; }
+.kwia-intent--Solucao           { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+.kwia-intent--Concorrentes      { background:#fdf4ff; color:#7e22ce; border-color:#e9d5ff; }
+.kwia-intent--Meio-de-funil     { background:#fefce8; color:#a16207; border-color:#fef08a; }
+.kwia-intent--Topo-de-funil     { background:#f0f9ff; color:#0369a1; border-color:#bae6fd; }
+.kwia-intent--Generica          { background:var(--bg); color:var(--text-muted); border-color:var(--border); }
+
+/* ── Quota Panel ────────────────────────────────────────────────────────── */
+.kwia-quota-panel {
+  padding: 14px 20px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+.kwia-quota-header {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px; flex-wrap: wrap; gap: 6px;
+}
+.kwia-quota-title {
+  font-size: .82rem; font-weight: 700; color: var(--text-secondary);
+  letter-spacing: .02em; text-transform: uppercase;
+}
+.kwia-quota-alert {
+  font-size: .78rem; font-weight: 700;
+  padding: 3px 10px; border-radius: 99px;
+}
+.kwia-quota-alert--warning  { background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; }
+.kwia-quota-alert--critical { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; animation:kwiaQuotaPulse 1s infinite; }
+@keyframes kwiaQuotaPulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+.kwia-quota-bars { display: flex; flex-direction: column; gap: 8px; }
+.kwia-quota-bar-row {
+  display: grid; grid-template-columns: 80px 1fr 140px;
+  align-items: center; gap: 10px; font-size: .8rem;
+}
+.kwia-quota-bar-label { color: var(--text-secondary); font-weight: 500; }
+.kwia-quota-bar-track {
+  height: 8px; background: var(--border); border-radius: 99px; overflow: hidden;
+}
+.kwia-quota-bar-fill {
+  height: 100%; background: var(--accent); border-radius: 99px;
+  transition: width .4s ease, background .3s;
+}
+.kwia-quota-bar-fill--plan     { background: #7c3aed; }
+.kwia-quota-bar-fill--warning  { background: #f59e0b !important; }
+.kwia-quota-bar-fill--critical { background: #ef4444 !important; }
+.kwia-quota-bar-count {
+  color: var(--text-secondary); font-size: .78rem;
+  font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right;
+}
+.kwia-quota-meta { font-size: .75rem; color: var(--text-muted); margin-top: 8px; }
+.kwia-attempt-cache-badge {
+  font-size: .7rem; background: #f0fdf4; color: #15803d;
+  border: 1px solid #bbf7d0; border-radius: 99px; padding: 1px 7px; margin-left: 6px;
+}
+
+body.tab-kwia-active .layout { max-width: 100%; padding: 0 20px; }
+
+@media (max-width: 860px) {
+  .kwia-form-grid { grid-template-columns: 1fr; }
+  body.tab-kwia-active .layout { padding: 0 12px; }
+  .kwia-quota-bar-row { grid-template-columns: 60px 1fr 110px; }
 }

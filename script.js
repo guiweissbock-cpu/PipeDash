@@ -914,11 +914,33 @@ function renderCharts(creatives) {
 }
 
 // ---------------------------------------------------------------------------
+// AUDITORIA CRUZADA — compara métricas entre Cards e Visão Geral
+// ---------------------------------------------------------------------------
+function _auditDashboard(cardMetrics) {
+  let ovMeet = 0, ovSign = 0;
+  if (state.reunioesFiltered.length > 0) {
+    ({ reunioes: ovMeet, assinaturas: ovSign } = computeReunioesReport(state.reunioesFiltered));
+  } else if (state.reunioesRows.length === 0) {
+    const zohoBase = state.zohoFiltered.length > 0 ? state.zohoFiltered : state.zohoRows;
+    ({ reunioes: ovMeet, assinaturas: ovSign } = computeZohoMetaMetrics(zohoBase));
+  }
+  const meetOk = cardMetrics.reunioes === ovMeet;
+  const signOk = cardMetrics.assinaturas === ovSign;
+  console.group("[Dashboard Audit]");
+  console.log(`Reuniões    — Cards: ${cardMetrics.reunioes} | Visão Geral Meta: ${ovMeet} ${meetOk ? "✅" : "⚠️ DIVERGÊNCIA"}`);
+  console.log(`Assinaturas — Cards: ${cardMetrics.assinaturas} | Visão Geral Meta: ${ovSign} ${signOk ? "✅" : "⚠️ DIVERGÊNCIA"}`);
+  console.log(`Leads Meta (CSV): ${cardMetrics.leadsMeta} | Leads Zoho (CSV): ${cardMetrics.leadsZoho}`);
+  if (!meetOk) console.warn("[Dashboard Audit] ⚠️ Reuniões divergem entre Cards e Visão Geral");
+  if (!signOk) console.warn("[Dashboard Audit] ⚠️ Assinaturas divergem entre Cards e Visão Geral");
+  console.groupEnd();
+}
+
+// ---------------------------------------------------------------------------
 // RENDER GERAL
 // ---------------------------------------------------------------------------
 function renderAll() {
   const creatives = state.filtered;
-  renderCards(creatives);
+  const cardMetrics = renderCards(creatives);
   renderBadges(creatives);
   renderRankings(creatives);
   renderInsights(creatives);
@@ -936,6 +958,7 @@ function renderAll() {
   renderOverview();
   renderInsightsIA();
   renderFinanceiro();
+  _auditDashboard(cardMetrics);
 }
 
 // ---------------------------------------------------------------------------
@@ -2277,7 +2300,7 @@ function renderLiveMeta(rows) {
   const ctr      = T.impressions > 0 ? T.clicks / T.impressions * 100   : 0;
   const cpc      = T.clicks      > 0 ? T.spend / T.clicks               : 0;
   const cpl      = T.leads       > 0 ? T.spend / T.leads                : null;
-  const tConvMql = T.leads       > 0 ? fmtPct(tMql / T.leads * 100)    : "—";
+  const tConvMql = T.leads       > 0 ? fmtPct(totalMqlDisp / T.leads * 100) : "—";
 
   const totalsHtml = `
     <tr class="lm-totals-row">
@@ -2292,7 +2315,7 @@ function renderLiveMeta(rows) {
       <td>${cpl !== null ? fmtCurrency(cpl) : "—"}</td>
       <td>${fmtCurrency(cpc)}</td>
       <td>${fmtInt(T.leads)}</td>
-      <td>${fmtInt(tMql)}</td>
+      <td>${fmtInt(totalMqlDisp)}</td>
       <td>${tConvMql}</td>
       <td>${fmtInt(tReunioes)}</td>
       <td>${fmtInt(tAssinaturas)}</td>
@@ -2825,11 +2848,15 @@ function renderOverview() {
   const mImpr   = mSum("impressoes");
   const mClicks = mSum("cliques");
   const mLeads  = mSum("leadsMeta");
-  let   mMeet = 0, mSign = 0;
-  if (state.reunioesFiltered.length > 0)
+  let mMeet = 0, mSign = 0;
+  if (state.reunioesFiltered.length > 0) {
     ({ reunioes: mMeet, assinaturas: mSign } = computeReunioesReport(state.reunioesFiltered));
-  else if (state.reunioesRows.length > 0)
-    ({ reunioes: mMeet, assinaturas: mSign } = computeReunioesReport(state.reunioesRows));
+  } else if (state.reunioesRows.length === 0) {
+    // Sem arquivo reuniões carregado — usa stage-check via Zoho como fallback
+    const zohoBase = state.zohoFiltered.length > 0 ? state.zohoFiltered : state.zohoRows;
+    ({ reunioes: mMeet, assinaturas: mSign } = computeZohoMetaMetrics(zohoBase));
+  }
+  // reunioesRows existe mas filtro retornou 0 → mMeet/mSign ficam 0 (alinhado com renderCards)
   const mCtr    = mImpr   > 0 ? mClicks / mImpr   : 0;
   const mCpc    = mClicks > 0 ? mInvest / mClicks  : 0;
   const mCpl    = mMeet   > 0 ? mInvest / mMeet    : 0;
@@ -2896,7 +2923,7 @@ function renderOverview() {
     ["Assinaturas",            nvM(mSign,   fmtInt),      nvG(gSign,   fmtInt),      fmtInt(tSign)],
     ["Conv. Lead → Reunião",   nvM(mConvLM, pct),        nvG(gConvLM, pct),        pct(tConvLM)],
     ["Conv. Reunião → Assin.", nvM(mConvMS, pct),        nvG(gConvMS, pct),        pct(tConvMS)],
-    ["CPL (custo/reunião)",    nvM(mCpl,    cur),         nvG(gCpl,    cur),         cur(tCpl)],
+    ["Custo por Reunião",      nvM(mCpl,    cur),         nvG(gCpl,    cur),         cur(tCpl)],
     ["CPA (custo/assinatura)", nvM(mCpa,    cur),         nvG(gCpa,    cur),         cur(tCpa)],
   ];
   const tbody = document.getElementById("ovComparisonBody");
@@ -2936,11 +2963,11 @@ function renderOverview() {
     if (bestMeet) metaIns.push(li(`Campanha com mais reuniões: ${val(bestMeet.name)} (${val(fmtInt(bestMeet.reunioes))})`));
     const bestCpl = camps.filter(c => c.reunioes > 0 && c.valorGasto > 0)
       .sort((a, b) => (a.valorGasto / a.reunioes) - (b.valorGasto / b.reunioes))[0];
-    if (bestCpl) metaIns.push(li(`Melhor CPL por campanha: ${val(bestCpl.name)} — ${val(fmtCurrency(bestCpl.valorGasto / bestCpl.reunioes))}`));
+    if (bestCpl) metaIns.push(li(`Menor C/Reunião por campanha: ${val(bestCpl.name)} — ${val(fmtCurrency(bestCpl.valorGasto / bestCpl.reunioes))}`));
     const bestCpa = camps.filter(c => c.assinaturas > 0 && c.valorGasto > 0)
       .sort((a, b) => (a.valorGasto / a.assinaturas) - (b.valorGasto / b.assinaturas))[0];
     if (bestCpa) metaIns.push(li(`Melhor CPA por campanha: ${val(bestCpa.name)} — ${val(fmtCurrency(bestCpa.valorGasto / bestCpa.assinaturas))}`));
-    if (mCpl > 0) metaIns.push(li(`CPL médio Meta: ${val(fmtCurrency(mCpl))}`));
+    if (mCpl > 0) metaIns.push(li(`Custo/Reunião médio Meta: ${val(fmtCurrency(mCpl))}`));
     if (mCpa > 0) metaIns.push(li(`CPA médio Meta: ${val(fmtCurrency(mCpa))}`));
     if (mMeet > 0) metaIns.push(li(`Taxa Conv. Reunião→Assin. Meta: ${val(pct(mConvMS))}`));
   } else {
@@ -2958,7 +2985,7 @@ function renderOverview() {
       .filter(c => c.ctr > 0)
       .sort((a, b) => b.ctr - a.ctr)[0];
     if (bestGCtr) googleIns.push(li(`Maior CTR por campanha: ${val(bestGCtr.name)} — ${val(fmtGadsCtr(bestGCtr.ctr))}`));
-    if (gCpl > 0) googleIns.push(li(`CPL Google Ads (custo/reunião): ${val(fmtCurrency(gCpl))}`));
+    if (gCpl > 0) googleIns.push(li(`Custo/Reunião Google Ads: ${val(fmtCurrency(gCpl))}`));
     if (gCpa > 0) googleIns.push(li(`CPA Google Ads (custo/assinatura): ${val(fmtCurrency(gCpa))}`));
     const bestKw = (gadsState.keywords || []).find(k => k.clicks > 0);
     if (bestKw) googleIns.push(li(`Top palavra-chave: ${val(bestKw.keyword)} — ${val(fmtInt(bestKw.clicks))} cliques`));
@@ -2975,7 +3002,7 @@ function renderOverview() {
     if (mCpl > 0 || gCpl > 0) {
       const betterCpl = (mCpl > 0 && gCpl > 0) ? (mCpl <= gCpl ? "Meta" : "Google") : (mCpl > 0 ? "Meta" : "Google");
       const betterCplVal = betterCpl === "Meta" ? mCpl : gCpl;
-      totIns.push(li(`Canal com melhor CPL: ${win(betterCpl)} (${val(fmtCurrency(betterCplVal))})`));
+      totIns.push(li(`Canal com menor Custo/Reunião: ${win(betterCpl)} (${val(fmtCurrency(betterCplVal))})`));
     }
     if (mCpa > 0 || gCpa > 0) {
       const betterCpa = (mCpa > 0 && gCpa > 0) ? (mCpa <= gCpa ? "Meta" : "Google") : (mCpa > 0 ? "Meta" : "Google");
@@ -3034,7 +3061,7 @@ function renderGadsSummary() {
     { label: "Reuniões Geradas",                 value: fmtInt(reunioes) },
     { label: "Assinaturas Geradas",              value: fmtInt(assinaturas) },
     { label: "Conversão (Reunião → Assinatura)", value: fmtPct(conv) },
-    { label: "CPL (Custo por Reunião)",          value: cpl > 0 ? fmtCurrency(cpl) : "—" },
+    { label: "Custo por Reunião",                 value: cpl > 0 ? fmtCurrency(cpl) : "—" },
     { label: "CPA (Custo por Assinatura)",       value: cpa > 0 ? fmtCurrency(cpa) : "—" },
   ];
   const grid = document.getElementById("gadsSummary");
@@ -3057,7 +3084,7 @@ function renderGadsOverview() {
     { label: "Reuniões Google Ads",    value: fmtInt(reunioes) },
     { label: "Assinaturas Google Ads", value: fmtInt(assinaturas) },
     { label: "Conversão Google Ads",   value: fmtPct(conv) },
-    { label: "CPL Google Ads",         value: cpl > 0 ? fmtCurrency(cpl) : "—" },
+    { label: "Custo/Reunião Google Ads", value: cpl > 0 ? fmtCurrency(cpl) : "—" },
     { label: "CPA Google Ads",         value: cpa > 0 ? fmtCurrency(cpa) : "—" },
   ];
   grid.innerHTML = items
@@ -3266,6 +3293,115 @@ document.querySelectorAll("#gadsCampaignsTable .gads-sortable").forEach(th => {
     renderGadsCampaigns();
   });
 });
+
+// =============================================================================
+// KEYWORD PLANNER — Geração de ideias com máximo de cliques
+// =============================================================================
+
+let _kwResults = [];
+
+const COMP_LABEL = { LOW: "Baixa", MEDIUM: "Média", HIGH: "Alta", UNSPECIFIED: "—" };
+const COMP_COLOR = { LOW: "#2ecc8f", MEDIUM: "#f5b942", HIGH: "#ff6b6b", UNSPECIFIED: "#9aa4b8" };
+
+function renderKwResults(data) {
+  const tbody   = document.getElementById("kwResultsBody");
+  const wrap    = document.getElementById("kwResultsWrap");
+  const count   = document.getElementById("kwResultCount");
+  const exportBtn = document.getElementById("kwExportBtn");
+
+  if (!data || data.length === 0) {
+    wrap.style.display = "none";
+    return;
+  }
+
+  _kwResults = data;
+  count.textContent = `${data.length} palavras-chave encontradas — ordenadas por potencial de cliques`;
+  exportBtn.disabled = false;
+  wrap.style.display = "";
+
+  const maxScore = data[0]?.score || 1;
+  tbody.innerHTML = data.map((k, i) => {
+    const barW  = maxScore > 0 ? Math.round(k.score / maxScore * 60) : 0;
+    const cComp = COMP_COLOR[k.competition] || "#9aa4b8";
+    const lComp = COMP_LABEL[k.competition] || "—";
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:6px 10px;color:var(--text-muted);font-size:.75rem">${i + 1}</td>
+      <td style="padding:6px 10px;font-weight:500">${escapeHtml(k.keyword)}</td>
+      <td style="padding:6px 10px;text-align:right">${k.volume.toLocaleString("pt-BR")}</td>
+      <td style="padding:6px 10px;text-align:center">
+        <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:.75rem;background:${cComp}22;color:${cComp};font-weight:600">${lComp}</span>
+      </td>
+      <td style="padding:6px 10px;text-align:right">${k.lowCpc > 0 ? "R$ " + k.lowCpc.toFixed(2) : "—"}</td>
+      <td style="padding:6px 10px;text-align:right">${k.hiCpc  > 0 ? "R$ " + k.hiCpc.toFixed(2)  : "—"}</td>
+      <td style="padding:6px 10px;text-align:right">
+        <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">
+          <div style="width:${barW}px;height:6px;background:#6c5ce7;border-radius:3px;min-width:2px"></div>
+          <span style="font-weight:600;color:#6c5ce7">${k.score.toLocaleString("pt-BR")}</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+async function generateKeywordIdeas() {
+  const btn    = document.getElementById("kwGenerateBtn");
+  const status = document.getElementById("kwPlannerStatus");
+
+  const raw = (document.getElementById("kwSeeds").value || "").trim();
+  if (!raw) { showToast("Digite ao menos uma palavra-chave semente.", "error"); return; }
+
+  const seeds     = raw.split("\n").map(s => s.trim()).filter(Boolean);
+  const minVolume = parseInt(document.getElementById("kwMinVolume").value || "0", 10);
+  const network   = document.getElementById("kwNetwork").value;
+
+  btn.disabled       = true;
+  status.textContent = "Buscando ideias...";
+  status.className   = "process-status";
+
+  try {
+    const res = await fetch("/api/google-ads/keyword-ideas", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ seeds, minVolume, network }),
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || "Erro desconhecido");
+
+    renderKwResults(json.data || []);
+    status.textContent = `${json.count} palavras-chave — Score = vol/CPC (maior = mais cliques por real)`;
+    status.className   = "process-status success";
+  } catch (err) {
+    status.textContent = `Erro: ${err.message}`;
+    status.className   = "process-status error";
+    showToast(err.message, "error", 6000);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function exportKwCsv() {
+  if (!_kwResults.length) return;
+  const header = ["#", "Palavra-chave", "Volume/mês", "Concorrência", "Índice", "CPC mín (R$)", "CPC máx (R$)", "Score cliques"];
+  const rows   = _kwResults.map((k, i) => [
+    i + 1,
+    `"${k.keyword.replace(/"/g, '""')}"`,
+    k.volume,
+    COMP_LABEL[k.competition] || k.competition,
+    k.compIndex,
+    k.lowCpc.toFixed(2),
+    k.hiCpc.toFixed(2),
+    k.score,
+  ]);
+  const csv  = [header, ...rows].map(r => r.join(",")).join("\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement("a"), { href: url, download: "keyword-ideas.csv" });
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById("kwGenerateBtn").addEventListener("click", generateKeywordIdeas);
+document.getElementById("kwExportBtn").addEventListener("click", exportKwCsv);
 
 // =============================================================================
 // INSIGHTS IA — Análise automática dos criativos da Live Meta

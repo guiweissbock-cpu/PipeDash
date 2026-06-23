@@ -34,6 +34,7 @@
   <button class="tab-btn" data-tab="googleads">🎯 Google Ads</button>
   <button class="tab-btn" data-tab="insights">💡 Insights IA</button>
   <button class="tab-btn" data-tab="fin">💰 Financeiro</button>
+  <button class="tab-btn" data-tab="kwia">🧠 Keyword Planner IA</button>
 </div>
 
 <main class="layout">
@@ -548,6 +549,58 @@
       </section>
     </div>
 
+    <!-- ── Keyword Planner ────────────────────────────────────────────────── -->
+    <section class="card" id="kwPlannerSection" style="margin-top:16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <h3 style="margin:0;font-size:1rem">🔍 Keyword Planner — Máximo de Cliques</h3>
+        <span id="kwPlannerStatus" class="process-status" style="font-size:.8rem"></span>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
+        <div class="filter-field" style="flex:1;min-width:240px">
+          <label for="kwSeeds">Palavras-chave semente <span style="font-weight:400;color:var(--text-muted)">(uma por linha)</span></label>
+          <textarea id="kwSeeds" rows="4" placeholder="coaching executivo&#10;consultoria empresarial&#10;treinamento liderança" style="width:100%;resize:vertical;font-size:.85rem;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text)"></textarea>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;min-width:160px">
+          <div class="filter-field">
+            <label for="kwMinVolume">Volume mínimo/mês</label>
+            <input type="number" id="kwMinVolume" value="100" min="0" step="50" style="width:100%" />
+          </div>
+          <div class="filter-field">
+            <label for="kwNetwork">Rede</label>
+            <select id="kwNetwork" style="width:100%">
+              <option value="GOOGLE_SEARCH">Google Search</option>
+              <option value="GOOGLE_SEARCH_AND_PARTNERS">Search + Parceiros</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button id="kwGenerateBtn" class="btn btn--primary" style="white-space:nowrap">Gerar lista</button>
+          <button id="kwExportBtn" class="btn btn--secondary" style="white-space:nowrap" disabled>⬇ Exportar CSV</button>
+        </div>
+      </div>
+      <div id="kwResultsWrap" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span id="kwResultCount" style="font-size:.85rem;color:var(--text-muted)"></span>
+        </div>
+        <div style="overflow-x:auto">
+          <table id="kwResultsTable" style="width:100%;border-collapse:collapse;font-size:.82rem">
+            <thead>
+              <tr style="background:var(--bg);border-bottom:2px solid var(--border)">
+                <th style="text-align:left;padding:7px 10px">#</th>
+                <th style="text-align:left;padding:7px 10px">Palavra-chave</th>
+                <th style="text-align:right;padding:7px 10px">Vol/mês</th>
+                <th style="text-align:center;padding:7px 10px">Concorrência</th>
+                <th style="text-align:right;padding:7px 10px">CPC mín</th>
+                <th style="text-align:right;padding:7px 10px">CPC máx</th>
+                <th style="text-align:right;padding:7px 10px">Score cliques</th>
+              </tr>
+            </thead>
+            <tbody id="kwResultsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
   </div><!-- /tab googleads -->
 
   <!-- ── TAB: INSIGHTS IA ──────────────────────────────────────────────────── -->
@@ -741,7 +794,377 @@
 
 </div>
 
+  <!-- ── TAB: KEYWORD PLANNER IA ────────────────────────────────────────────── -->
+  <div class="tab-panel" data-tab="kwia">
+
+    <!-- Cabeçalho -->
+    <section class="card" style="padding:20px 24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <h2 class="section-title" style="margin:0;font-size:1.1rem">🧠 Keyword Planner IA</h2>
+          <p style="margin:4px 0 0;font-size:.83rem;color:var(--text-muted)">Planejador iterativo · Gera hipóteses, consulta a API e refina até encontrar o melhor plano</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="kwiaRunBtn"   class="btn btn--primary">▶ Executar Planner</button>
+          <button id="kwiaStopBtn"  class="btn btn--secondary" disabled>⏹ Parar</button>
+          <button id="kwiaClearBtn" class="btn btn--secondary">🗑 Limpar</button>
+          <button id="kwiaExportBtn" class="btn btn--secondary" disabled>⬇ Exportar CSV</button>
+          <button id="kwiaSavePlanBtn" class="btn btn--secondary" disabled>💾 Salvar Plano</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Configuração -->
+    <section class="card" id="kwiaConfigSection">
+      <h3 class="section-title" style="margin-bottom:16px">Configuração do Plano</h3>
+      <div class="kwia-form-grid">
+
+        <div class="kwia-form-col">
+          <div class="filter-field">
+            <label for="kwiaSubject">Assunto principal</label>
+            <input type="text" id="kwiaSubject" placeholder="Ex: Vendas B2B, Treinamento comercial..." value="Vendas B2B" />
+          </div>
+          <div class="filter-field" style="margin-top:12px">
+            <label for="kwiaSeeds">Palavras-chave de referência <span style="font-weight:400;color:var(--text-muted)">(uma por linha)</span></label>
+            <textarea id="kwiaSeeds" rows="5" placeholder="como vender todos os dias no B2B&#10;como criar receita recorrente B2B&#10;meu time de vendas não bate meta&#10;plataforma de treinamento comercial"></textarea>
+          </div>
+          <div class="filter-field" style="margin-top:12px">
+            <label for="kwiaProducts">Produtos ou serviços <span style="font-weight:400;color:var(--text-muted)">(um por linha)</span></label>
+            <textarea id="kwiaProducts" rows="4" placeholder="universidade corporativa de vendas&#10;plataforma de treinamento comercial&#10;PDI para vendedores&#10;treinamento para equipe de vendas B2B"></textarea>
+          </div>
+          <div class="filter-field" style="margin-top:12px">
+            <label for="kwiaUrl">URL de referência <span style="font-weight:400;color:var(--text-muted)">(opcional)</span></label>
+            <input type="url" id="kwiaUrl" placeholder="https://exemplo.com.br" />
+          </div>
+        </div>
+
+        <div class="kwia-form-col">
+          <div class="kwia-form-row">
+            <div class="filter-field">
+              <label for="kwiaCountry">País</label>
+              <select id="kwiaCountry">
+                <option value="geoTargetConstants/2076" selected>Brasil</option>
+                <option value="geoTargetConstants/2840">EUA</option>
+                <option value="geoTargetConstants/2620">Portugal</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="kwiaLanguage">Idioma</label>
+              <select id="kwiaLanguage">
+                <option value="languageConstants/1014" selected>Português</option>
+                <option value="languageConstants/1000">Inglês</option>
+                <option value="languageConstants/1003">Espanhol</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="kwiaNetwork">Rede</label>
+              <select id="kwiaNetwork">
+                <option value="GOOGLE_SEARCH" selected>Google Search</option>
+                <option value="GOOGLE_SEARCH_AND_PARTNERS">Search + Parceiros</option>
+              </select>
+            </div>
+          </div>
+          <div class="kwia-form-row" style="margin-top:12px">
+            <div class="filter-field">
+              <label for="kwiaGoalClicks">Meta de cliques/dia</label>
+              <input type="number" id="kwiaGoalClicks" value="1200" min="1" step="100" />
+            </div>
+            <div class="filter-field">
+              <label for="kwiaDailyBudget">Orçamento diário (R$)</label>
+              <input type="number" id="kwiaDailyBudget" value="1000" min="1" step="50" />
+            </div>
+            <div class="filter-field">
+              <label for="kwiaMaxCpc">CPC máximo (R$) <span style="font-weight:400;color:var(--text-muted)">0=sem limite</span></label>
+              <input type="number" id="kwiaMaxCpc" value="3" min="0" step="0.5" />
+            </div>
+          </div>
+          <div class="kwia-form-row" style="margin-top:12px">
+            <div class="filter-field">
+              <label for="kwiaMatchType">Correspondência</label>
+              <select id="kwiaMatchType">
+                <option value="BROAD">Ampla</option>
+                <option value="PHRASE">Frase</option>
+                <option value="EXACT">Exata</option>
+                <option value="MIXED" selected>Mesclada</option>
+              </select>
+            </div>
+            <div class="filter-field filter-field--full">
+              <label>Intenção desejada <span style="font-weight:400;color:var(--text-muted)">(nenhuma = todas)</span></label>
+              <div id="kwiaIntentGroup" class="kwia-intent-group">
+                <label class="kwia-intent-check-label"><input type="checkbox" class="kwia-intent-check" value="Fundo de funil" /> Fundo de funil</label>
+                <label class="kwia-intent-check-label"><input type="checkbox" class="kwia-intent-check" value="Meio de funil" /> Meio de funil</label>
+                <label class="kwia-intent-check-label"><input type="checkbox" class="kwia-intent-check" value="Topo de funil" /> Topo de funil</label>
+                <label class="kwia-intent-check-label"><input type="checkbox" class="kwia-intent-check" value="Concorrentes" /> Concorrentes</label>
+                <label class="kwia-intent-check-label"><input type="checkbox" class="kwia-intent-check" value="Problema/Dor" /> Problema/Dor</label>
+                <label class="kwia-intent-check-label"><input type="checkbox" class="kwia-intent-check" value="Solução" /> Solução</label>
+                <label class="kwia-intent-check-label"><input type="checkbox" class="kwia-intent-check" value="Curso/Treinamento" /> Curso/Treinamento</label>
+              </div>
+            </div>
+          </div>
+          <div class="kwia-form-row" style="margin-top:12px">
+            <div class="filter-field">
+              <label for="kwiaMaxAttempts">Máx. de tentativas</label>
+              <input type="number" id="kwiaMaxAttempts" value="10" min="1" max="10" step="1" />
+            </div>
+            <div class="filter-field">
+              <label for="kwiaMaxKeywords">Palavras por plano</label>
+              <input type="number" id="kwiaMaxKeywords" value="50" min="5" max="200" step="5" />
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Painel de Quota -->
+    <section class="card kwia-quota-panel" id="kwiaQuotaPanel">
+      <div class="kwia-quota-header">
+        <span class="kwia-quota-title">📊 Quota Google Ads API — Basic Access</span>
+        <span id="kwiaQuotaAlert" class="kwia-quota-alert" hidden></span>
+      </div>
+      <div class="kwia-quota-bars">
+        <div class="kwia-quota-bar-row">
+          <span class="kwia-quota-bar-label">Diária</span>
+          <div class="kwia-quota-bar-track">
+            <div class="kwia-quota-bar-fill" id="kwiaQuotaBarDaily" style="width:0%"></div>
+          </div>
+          <span class="kwia-quota-bar-count" id="kwiaQuotaCountDaily">— / 12.000 ops</span>
+        </div>
+        <div class="kwia-quota-bar-row">
+          <span class="kwia-quota-bar-label">Este plano</span>
+          <div class="kwia-quota-bar-track">
+            <div class="kwia-quota-bar-fill kwia-quota-bar-fill--plan" id="kwiaQuotaBarPlan" style="width:0%"></div>
+          </div>
+          <span class="kwia-quota-bar-count" id="kwiaQuotaCountPlan">— / 2.400 ops</span>
+        </div>
+      </div>
+      <div class="kwia-quota-meta" id="kwiaQuotaMeta">Cache: — entradas</div>
+    </section>
+
+    <!-- Progresso -->
+    <section class="card" id="kwiaProgressSection" hidden>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <h3 class="section-title" style="margin:0">Planner em execução…</h3>
+        <span id="kwiaProgressBadge" class="kwia-badge kwia-badge--running">Em andamento</span>
+      </div>
+      <div class="kwia-progress-bar-wrap">
+        <div class="kwia-progress-bar" id="kwiaProgressBar" style="width:0%"></div>
+      </div>
+      <div class="kwia-progress-grid">
+        <div class="kwia-progress-stat">
+          <span class="kwia-progress-label">Tentativa</span>
+          <span class="kwia-progress-value" id="kwiaProgAttempt">—</span>
+        </div>
+        <div class="kwia-progress-stat">
+          <span class="kwia-progress-label">Hipótese</span>
+          <span class="kwia-progress-value kwia-progress-value--sm" id="kwiaProgStrategy">—</span>
+        </div>
+        <div class="kwia-progress-stat">
+          <span class="kwia-progress-label">Pool total</span>
+          <span class="kwia-progress-value" id="kwiaProgPool">—</span>
+        </div>
+        <div class="kwia-progress-stat">
+          <span class="kwia-progress-label">Cliques estimados</span>
+          <span class="kwia-progress-value" id="kwiaProgClicks">—</span>
+        </div>
+        <div class="kwia-progress-stat">
+          <span class="kwia-progress-label">Meta</span>
+          <span class="kwia-progress-value" id="kwiaProgGoal">—</span>
+        </div>
+        <div class="kwia-progress-stat">
+          <span class="kwia-progress-label">Gap</span>
+          <span class="kwia-progress-value" id="kwiaProgGap">—</span>
+        </div>
+        <div class="kwia-progress-stat">
+          <span class="kwia-progress-label">CPC médio</span>
+          <span class="kwia-progress-value" id="kwiaProgCpc">—</span>
+        </div>
+        <div class="kwia-progress-stat">
+          <span class="kwia-progress-label">Status</span>
+          <span class="kwia-progress-value kwia-progress-value--sm" id="kwiaProgStatus">Aguardando…</span>
+        </div>
+      </div>
+      <div id="kwiaAttemptLog" class="kwia-attempt-log"></div>
+    </section>
+
+    <!-- Melhor plano -->
+    <section class="card" id="kwiaBestPlanSection" hidden>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <h3 class="section-title" style="margin:0">Melhor Plano Encontrado</h3>
+        <span id="kwiaPlanViabilityBadge" class="kwia-badge">—</span>
+      </div>
+      <div class="kwia-plan-grid" id="kwiaPlanCards"></div>
+      <div id="kwiaPlanRecommendation" class="kwia-recommendation" style="margin-top:14px"></div>
+    </section>
+
+    <!-- Simulador -->
+    <section class="card" id="kwiaSimSection" hidden>
+      <h3 class="section-title" style="margin-bottom:14px">Simulador</h3>
+      <p style="font-size:.82rem;color:var(--text-muted);margin:0 0 12px">Ajuste os parâmetros e o simulador recalcula automaticamente com as palavras selecionadas.</p>
+      <div class="kwia-sim-grid">
+        <div class="filter-field">
+          <label for="kwiaSimBudget">Orçamento diário (R$)</label>
+          <input type="number" id="kwiaSimBudget" value="1000" min="1" step="50" />
+        </div>
+        <div class="filter-field">
+          <label for="kwiaSimMaxCpc">CPC máximo (R$)</label>
+          <input type="number" id="kwiaSimMaxCpc" value="3" min="0" step="0.5" />
+        </div>
+        <div class="filter-field">
+          <label for="kwiaSimMatch">Correspondência</label>
+          <select id="kwiaSimMatch">
+            <option value="BROAD">Ampla</option>
+            <option value="PHRASE">Frase</option>
+            <option value="EXACT">Exata</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="kwiaSimGoal">Meta de cliques/dia</label>
+          <input type="number" id="kwiaSimGoal" value="1200" min="1" step="100" />
+        </div>
+      </div>
+      <div class="kwia-sim-results" id="kwiaSimResults"></div>
+    </section>
+
+    <!-- Tabela de resultados -->
+    <section class="card" id="kwiaTableSection" hidden>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px">
+        <div>
+          <h3 class="section-title" style="margin:0">Palavras Encontradas</h3>
+          <span id="kwiaTableCount" style="font-size:.82rem;color:var(--text-muted)"></span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <label style="font-size:.82rem;color:var(--text-muted)">Ordenar:</label>
+          <select id="kwiaTableSort" class="gads-search-input" style="width:auto;padding:6px 10px">
+            <option value="scoreFinal">Score Final</option>
+            <option value="volume">Volume</option>
+            <option value="avgCpc">Menor CPC</option>
+            <option value="cliquesDay5">Cliques/dia (5%)</option>
+            <option value="custoDia">Menor custo/dia</option>
+          </select>
+          <input type="search" id="kwiaTableSearch" placeholder="Filtrar palavras..." class="gads-search-input" style="width:180px" />
+          <button id="kwiaSelectAllBtn"  class="btn btn--secondary" style="font-size:.78rem;padding:6px 12px">Sel. todas</button>
+          <button id="kwiaPublishBtn"    class="btn btn--primary"   style="font-size:.78rem;padding:6px 12px" disabled>+ Adicionar ao Google Ads</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="kwiaTable" style="width:100%;border-collapse:collapse;font-size:.78rem">
+          <thead>
+            <tr style="background:var(--bg);border-bottom:2px solid var(--border)">
+              <th style="padding:7px 8px"><input type="checkbox" id="kwiaCheckAll" /></th>
+              <th style="text-align:left;padding:7px 8px">Keyword</th>
+              <th style="text-align:center;padding:7px 8px">Intenção</th>
+              <th style="text-align:center;padding:7px 8px">Match</th>
+              <th style="text-align:right;padding:7px 8px">Vol/mês</th>
+              <th style="text-align:right;padding:7px 8px">Cliques/dia</th>
+              <th style="text-align:center;padding:7px 8px">Concorr.</th>
+              <th style="text-align:right;padding:7px 8px">CPC mín</th>
+              <th style="text-align:right;padding:7px 8px">CPC máx</th>
+              <th style="text-align:right;padding:7px 8px">CPC médio</th>
+              <th style="text-align:right;padding:7px 8px">Cliques/dia 3%</th>
+              <th style="text-align:right;padding:7px 8px">Cliques/dia 5%</th>
+              <th style="text-align:right;padding:7px 8px">Cliques/dia 8%</th>
+              <th style="text-align:right;padding:7px 8px">Custo/dia</th>
+              <th style="text-align:right;padding:7px 8px">Custo/mês</th>
+              <th style="text-align:right;padding:7px 8px">Sc. Vol</th>
+              <th style="text-align:right;padding:7px 8px">Sc. Custo</th>
+              <th style="text-align:right;padding:7px 8px">Sc. Intent</th>
+              <th style="text-align:right;padding:7px 8px">Sc. Hist</th>
+              <th style="text-align:right;padding:7px 8px;font-weight:700;color:var(--accent)">Score</th>
+              <th style="text-align:center;padding:7px 8px">Status</th>
+              <th style="text-align:center;padding:7px 8px">Tentativa</th>
+            </tr>
+          </thead>
+          <tbody id="kwiaTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Histórico -->
+    <section class="card" id="kwiaHistorySection">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <h3 class="section-title" style="margin:0">Histórico de Planos</h3>
+        <button id="kwiaHistoryClearBtn" class="btn btn--secondary" style="font-size:.78rem;padding:6px 12px">Limpar histórico</button>
+      </div>
+      <div id="kwiaHistoryList" class="kwia-history-list">
+        <p style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:20px">Nenhum plano salvo. Execute o planner e clique em "Salvar Plano".</p>
+      </div>
+    </section>
+
+  </div><!-- /tab kwia -->
+
 </main>
+
+<!-- Modal: Confirmar limpeza do plano -->
+<div id="kwiaClearModal" class="modal-overlay" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" style="max-width:440px">
+    <h3 style="margin:0 0 14px;font-size:1rem;display:flex;align-items:center;gap:8px">
+      <span style="font-size:1.2rem">⚠️</span> Limpar Plano
+    </h3>
+    <p style="margin:0 0 10px;font-size:.88rem">Você possui alterações não salvas. Ao limpar o plano serão removidos:</p>
+    <ul style="margin:0 0 14px;padding-left:20px;line-height:2;font-size:.84rem;color:var(--text-secondary)">
+      <li>Configurações do plano</li>
+      <li>Palavras encontradas e métricas</li>
+      <li>Plano gerado e simulações</li>
+      <li>Cache de resultados da sessão atual</li>
+    </ul>
+    <p style="margin:0 0 20px;font-size:.80rem;color:var(--text-muted)">Os planos salvos no histórico não serão afetados.</p>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button id="kwiaClearCancelBtn"  class="btn btn--secondary">Cancelar</button>
+      <button id="kwiaClearConfirmBtn" class="btn btn--primary" style="background:#ef4444;border-color:#ef4444;color:#fff">Limpar Tudo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Publicar keywords no Google Ads -->
+<div id="kwiaPublishModal" class="modal-overlay" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" style="max-width:520px">
+    <button class="modal-close" id="kwiaModalClose">✕</button>
+    <h3 style="margin:0 0 16px;font-size:1rem">Adicionar palavras ao Google Ads</h3>
+    <p id="kwiaModalCount" style="font-size:.85rem;color:var(--text-muted);margin:0 0 16px"></p>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="filter-field">
+        <label for="kwiaModalCampaign">Campanha destino</label>
+        <select id="kwiaModalCampaign">
+          <option value="">Carregando campanhas…</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="kwiaModalAdGroup">Grupo de anúncio destino</label>
+        <select id="kwiaModalAdGroup">
+          <option value="">Selecione uma campanha primeiro</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div class="filter-field" style="flex:1;min-width:140px">
+          <label for="kwiaModalMatch">Correspondência</label>
+          <select id="kwiaModalMatch">
+            <option value="BROAD">Ampla</option>
+            <option value="PHRASE">Frase</option>
+            <option value="EXACT">Exata</option>
+          </select>
+        </div>
+        <div class="filter-field" style="flex:1;min-width:140px">
+          <label for="kwiaModalCpc">CPC máximo (R$)</label>
+          <input type="number" id="kwiaModalCpc" value="5" min="0.1" step="0.5" />
+        </div>
+        <div class="filter-field" style="flex:1;min-width:140px">
+          <label for="kwiaModalStatus">Status inicial</label>
+          <select id="kwiaModalStatus">
+            <option value="PAUSED" selected>Pausado (recomendado)</option>
+            <option value="ENABLED">Ativo</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div style="background:var(--bg);border-radius:8px;padding:12px;margin-top:14px;font-size:.82rem;color:var(--text-secondary)" id="kwiaModalConfirm"></div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+      <button id="kwiaModalCancelBtn" class="btn btn--secondary">Cancelar</button>
+      <button id="kwiaModalConfirmBtn" class="btn btn--primary" disabled>Confirmar e Adicionar</button>
+    </div>
+    <p id="kwiaModalResult" style="margin-top:10px;font-size:.82rem;text-align:center;display:none"></p>
+  </div>
+</div>
 
 <!-- Modal de Criativo -->
 <!-- Modal simples: lista de leads (reuniões ou assinaturas) da Live Meta -->
@@ -797,9 +1220,10 @@
 <div id="toast" class="toast"></div>
 
 <footer class="footer">
-  <p>Report Meta Ads + Zoho CRM · PipeLovers — dados processados localmente no navegador.</p>
+  <p>Report Meta Ads + Zoho CRM · PipeLovers — dados processados localmente no navegador. <span class="footer-version">v2.1.0</span></p>
 </footer>
 
 <script src="script.js"></script>
+<script src="kwia_module.js"></script>
 </body>
 </html>

@@ -9,6 +9,9 @@ credentials/
 # Cache com dados sensíveis (leads do Slack)
 slack_mql_cache.json
 
+# Estado de runtime (quota tracker — não versionar)
+_quota_state.json
+
 # Backups locais (nunca versionar)
 backups/
 

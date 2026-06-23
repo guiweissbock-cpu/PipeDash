@@ -386,6 +386,25 @@ app.get("/api/google-auth-callback", async (req, res) => {
   }
 });
 
+// ── POST /api/google-ads/keyword-ideas ───────────────────────────────────────
+// Gera ideias de palavras-chave com volume, CPC estimado e score de cliques.
+// Body: { seeds: ["palavra1", "palavra2"], minVolume: 100, network: "GOOGLE_SEARCH" }
+app.post("/api/google-ads/keyword-ideas", async (req, res) => {
+  try {
+    const { seeds, minVolume = 0, network, language, geoTargets } = req.body || {};
+    if (!Array.isArray(seeds) || seeds.filter(Boolean).length === 0) {
+      return res.status(400).json({ ok: false, error: "Envie ao menos uma palavra-chave semente em 'seeds'." });
+    }
+    const cleanSeeds = seeds.map(s => String(s).trim()).filter(Boolean);
+    const ideas      = await googleAdsService.generateKeywordIdeas(cleanSeeds, { network, language, geoTargets });
+    const filtered   = minVolume > 0 ? ideas.filter(k => k.volume >= minVolume) : ideas;
+    res.json({ ok: true, count: filtered.length, data: filtered });
+  } catch (err) {
+    console.error("[Keyword Ideas]", err.message);
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
 // ── GET /api/slack/mql ────────────────────────────────────────────────────────
 // Retorna leads MQL do canal #inside-sales-novo-lead.
 // Tenta SLACK_BOT_TOKEN; se falhar, usa slack_mql_cache.json (populado pelo Claude via MCP).
@@ -403,6 +422,139 @@ app.get("/api/slack/mql", async (req, res) => {
   }
 });
 
+// ── POST /api/keyword-planner/ia/run ─────────────────────────────────────────
+// Executa o planejador iterativo. Responde via SSE (stream).
+// Body: { subject, seeds, products, goalClicksDay, dailyBudget, maxCpc,
+//         maxAttempts, maxKeywords, network, matchType, intent, existingKeywords }
+app.post("/api/keyword-planner/ia/run", async (req, res) => {
+  if (!process.env.GOOGLE_ADS_REFRESH_TOKEN || !process.env.GOOGLE_ADS_CUSTOMER_ID) {
+    return res.status(500).json({ error: "Credenciais Google Ads não configuradas no .env" });
+  }
+
+  // SSE headers
+  res.setHeader("Content-Type",  "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection",    "keep-alive");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.flushHeaders();
+
+  const sendEvent = (data) => {
+    try { res.write(`data: ${JSON.stringify(data)}\n\n`); }
+    catch (_) { /* client disconnected */ }
+  };
+
+  try {
+    const kwPlannerService = require("./services/kwPlannerService");
+    await kwPlannerService.runIterativePlanner(req.body || {}, sendEvent);
+  } catch (err) {
+    console.error("[KwPlanner IA]", err.message);
+    sendEvent({ type: "error", error: err.message });
+  }
+
+  res.write("data: [DONE]\n\n");
+  res.end();
+});
+
+// ── GET /api/keyword-planner/ia/campaigns ─────────────────────────────────────
+// Lista campanhas da conta para o modal de publicação.
+app.get("/api/keyword-planner/ia/campaigns", async (req, res) => {
+  try {
+    if (!process.env.GOOGLE_ADS_REFRESH_TOKEN || !process.env.GOOGLE_ADS_CUSTOMER_ID) {
+      return res.status(500).json({ error: "Credenciais Google Ads não configuradas" });
+    }
+    const data = await googleAdsService.getCampaignsList();
+    res.json({ ok: true, data });
+  } catch (err) {
+    console.error("[KwPlanner Campaigns]", err.message);
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
+// ── GET /api/keyword-planner/ia/adgroups ─────────────────────────────────────
+// Lista grupos de anúncio de uma campanha. Query: campaignId
+app.get("/api/keyword-planner/ia/adgroups", async (req, res) => {
+  try {
+    const { campaignId } = req.query;
+    if (!campaignId) return res.status(400).json({ ok: false, error: "campaignId obrigatório" });
+    const data = await googleAdsService.getAdGroupsByCampaign(campaignId);
+    res.json({ ok: true, data });
+  } catch (err) {
+    console.error("[KwPlanner AdGroups]", err.message);
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
+// ── POST /api/keyword-planner/ia/publish ──────────────────────────────────────
+// Adiciona keywords selecionadas a um grupo de anúncio no Google Ads.
+// Body: { adGroupId, keywords, cpcMaxBRL, matchType, status }
+app.post("/api/keyword-planner/ia/publish", async (req, res) => {
+  try {
+    if (!process.env.GOOGLE_ADS_REFRESH_TOKEN || !process.env.GOOGLE_ADS_CUSTOMER_ID) {
+      return res.status(500).json({ error: "Credenciais Google Ads não configuradas" });
+    }
+    const { adGroupId, keywords, cpcMaxBRL = 5, matchType = "BROAD", status = "PAUSED" } = req.body || {};
+    if (!adGroupId)                               return res.status(400).json({ ok: false, error: "adGroupId obrigatório" });
+    if (!Array.isArray(keywords) || !keywords.length) return res.status(400).json({ ok: false, error: "keywords[] obrigatório" });
+
+    const result = await googleAdsService.addKeywordsToAdGroup({ adGroupId, keywords, cpcMaxBRL, matchType, status });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error("[KwPlanner Publish]", err.message);
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
+// ── GET /api/keyword-planner/ia/quota ────────────────────────────────────────
+// Retorna status atual da quota diária e cache em memória.
+// Aceita query: ?clearCache=1 para invalidar cache, ?resetQuota=1 (dev only)
+app.get("/api/keyword-planner/ia/quota", (req, res) => {
+  try {
+    const quotaManager = require("./services/quotaManager");
+    if (req.query.clearCache === "1") {
+      quotaManager.cacheClear();
+    }
+    const status = quotaManager.getStatus();
+    res.json({ ok: true, ...status });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── GET /api/keyword-planner/ia/test ─────────────────────────────────────────
+// Diagnóstico: testa generateKeywordIdeas com 1 seed e retorna resultado + combinação que funcionou.
+app.get("/api/keyword-planner/ia/test", async (req, res) => {
+  const seed        = req.query.seed || "treinamento de vendas";
+  const customerId  = (process.env.GOOGLE_ADS_CUSTOMER_ID || "").replace(/-/g, "");
+  const mccId       = (process.env.GOOGLE_ADS_MCC_ID || process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || "").replace(/-/g, "");
+  const kwOverride  = (process.env.GOOGLE_ADS_KW_CUSTOMER_ID || "").replace(/-/g, "");
+  console.log("[KwPlanner Test] customerId:", customerId, "| mccId:", mccId || "N/A", "| kwOverride:", kwOverride || "N/A");
+  try {
+    const ideas = await googleAdsService.generateKeywordIdeas([seed], {
+      language:   "languageConstants/1014",
+      geoTargets: ["geoTargetConstants/2076"],
+      network:    "GOOGLE_SEARCH",
+      pageSize:   10,
+    });
+    res.json({
+      ok: true, seed,
+      count: ideas.length,
+      sample: ideas.slice(0, 5),
+      config: { customerId, mccId: mccId || null, kwOverride: kwOverride || null },
+      hint: ideas.length === 0 ? "API retornou 0 resultados. As seeds podem não ter dados para essa região/idioma." : null,
+    });
+  } catch (err) {
+    console.error("[KwPlanner Test] Falhou:", err.message);
+    res.status(502).json({
+      ok: false, seed,
+      error: err.message,
+      config: { customerId, mccId: mccId || null, kwOverride: kwOverride || null },
+      hint: !mccId
+        ? "GOOGLE_ADS_MCC_ID não está no .env. Se sua conta é sub-conta de um MCC, adicione: GOOGLE_ADS_MCC_ID=<seu-mcc-id>"
+        : "Veja o console do servidor para detalhes do erro por combinação.",
+    });
+  }
+});
+
 // ── GET /api/status ───────────────────────────────────────────────────────────
 // Verifica quais integrações estão configuradas (sem expor os valores).
 app.get("/api/status", (_req, res) => {
@@ -411,10 +563,11 @@ app.get("/api/status", (_req, res) => {
   const cacheFile = path.join(__dirname, "slack_mql_cache.json");
   const hasSlack  = !!process.env.SLACK_BOT_TOKEN || fs.existsSync(cacheFile);
   res.json({
-    meta:   !!(process.env.META_ACCESS_TOKEN && process.env.META_AD_ACCOUNT_ID),
-    zoho:   !!(process.env.ZOHO_REFRESH_TOKEN && process.env.ZOHO_CLIENT_ID),
-    slack:  hasSlack,
-    google: !!(process.env.GOOGLE_ADS_REFRESH_TOKEN && process.env.GOOGLE_ADS_CUSTOMER_ID),
+    meta:       !!(process.env.META_ACCESS_TOKEN && process.env.META_AD_ACCOUNT_ID),
+    zoho:       !!(process.env.ZOHO_REFRESH_TOKEN && process.env.ZOHO_CLIENT_ID),
+    slack:      hasSlack,
+    google:     !!(process.env.GOOGLE_ADS_REFRESH_TOKEN && process.env.GOOGLE_ADS_CUSTOMER_ID),
+    googleMcc:  !!(process.env.GOOGLE_ADS_MCC_ID || process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID),
   });
 });
 

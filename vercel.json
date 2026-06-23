@@ -2,13 +2,14 @@
   "version": 2,
   "builds": [
     { "src": "index.html", "use": "@vercel/static" },
-    { "src": "script.js",  "use": "@vercel/static" },
-    { "src": "style.css",  "use": "@vercel/static" },
+    { "src": "script.js",      "use": "@vercel/static" },
+    { "src": "kwia_module.js", "use": "@vercel/static" },
+    { "src": "style.css",      "use": "@vercel/static" },
     { "src": "server.js",  "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/api/(.*)",              "dest": "/server.js" },
-    { "src": "/(script\\.js|style\\.css)", "dest": "/$1" },
+    { "src": "/(script\\.js|kwia_module\\.js|style\\.css)", "dest": "/$1" },
     { "src": "/(.*)",                  "dest": "/index.html" }
   ]
 }
