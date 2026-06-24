@@ -4856,3 +4856,12 @@ function finInlineEditNumber(cell, field, initId, onSave) {
   input.addEventListener("blur", save);
   input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } if (e.key === "Escape") onSave(); });
 }
+
+// ── Versão no footer ──────────────────────────────────────────────────────────
+fetch("/api/version")
+  .then(r => r.json())
+  .then(({ version, commit, env }) => {
+    const el = document.getElementById("app-version");
+    if (el) el.textContent = `v${version} · ${commit} · ${env}`;
+  })
+  .catch(() => {});

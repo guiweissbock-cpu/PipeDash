@@ -622,6 +622,34 @@ app.get("/api/status", (_req, res) => {
   });
 });
 
+// ── GET /api/version ─────────────────────────────────────────────────────────
+// Retorna versão, commit hash e ambiente para o footer do dashboard.
+// Em produção usa VERCEL_GIT_COMMIT_SHA (injetado automaticamente pela Vercel).
+// Em desenvolvimento usa git rev-parse para obter o hash local.
+app.get("/api/version", (req, res) => {
+  const { execSync } = require("child_process");
+  const pkg = require("./package.json");
+
+  let commit = process.env.VERCEL_GIT_COMMIT_SHA
+    ? process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 7)
+    : null;
+
+  if (!commit) {
+    try {
+      commit = execSync("git rev-parse --short HEAD", { stdio: ["pipe", "pipe", "ignore"] })
+        .toString().trim();
+    } catch (_) {
+      commit = "local";
+    }
+  }
+
+  res.json({
+    version: pkg.version,
+    commit,
+    env: process.env.VERCEL_ENV || "development",
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`\n✅ Dashboard rodando em http://localhost:${PORT}`);
   console.log(`   Meta:  ${process.env.META_ACCESS_TOKEN ? "✓ configurado" : "✗ META_ACCESS_TOKEN ausente"}`);
