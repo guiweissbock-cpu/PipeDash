@@ -134,4 +134,4 @@ git checkout -b hotfix/descricao
 | GitHub (`origin/main`) | `main` | `fd0e488` |
 | Vercel (produção) | `main` | `fd0e488` |
 
-Todos os ambientes sincronizados em: `fd0e488` — *fix: botões do Creative Studio invisíveis no tema claro*
+Todos os ambientes sincronizados em: `fd0e488`
