@@ -65,6 +65,7 @@ const state = {
   charts: {},
   metaFile: null,
   zohoFile: null,
+  isOfficialReunioesData: false, // true quando reunioesRows vem do relatório Zoho Analytics (não filtrar por isMetaOrigin)
 };
 
 // ---------------------------------------------------------------------------
@@ -358,11 +359,14 @@ function isMetaOrigin(origem) {
   const text    = normalizeKey(String(origem || ""));
   const noSpace = text.replace(/\s+/g, "");
   return (
-    text.includes("aula gratis")   ||
-    text.includes("aulas gratis")  ||
-    text.includes("meta ads")      ||
-    noSpace.includes("metaads")    ||
-    text.includes("tofu")          ||
+    text.includes("aula gratis")    ||
+    text.includes("aulas gratis")   ||
+    text.includes("meta ads")       ||
+    text.includes("meta adds")      ||  // variação de escrita de "Meta Ads"
+    noSpace.includes("metaads")     ||
+    noSpace.includes("metaadds")    ||  // variação com duplo 'd'
+    text.includes("pipelovers")     ||  // Site PipeLovers / WhatsApp PipeLovers
+    text.includes("tofu")           ||
     text.includes("bofu")
   );
 }
@@ -400,7 +404,7 @@ function countsAsMetaSignature(stage, origem) {
 // Dedup separado para cada métrica: uma empresa pode aparecer com "Reunião Realizada"
 // e depois com "Assinatura realizada" — ambos os records devem contribuir,
 // mas sem dupla contagem dentro da mesma categoria.
-function computeReunioesReport(reunioesRows) {
+function computeReunioesReport(reunioesRows, { skipOriginFilter = false } = {}) {
   const seenMeet = new Set();
   const seenSign = new Set();
   let reunioes    = 0;
@@ -414,9 +418,10 @@ function computeReunioesReport(reunioesRows) {
       ? `${contactKey}|${baseName}`
       : (contactKey || baseName || d.id || `${d.nomeNegocio}|${String(d.horaCriacao)}`);
 
-    const isMeta  = isMetaOrigin(d.origem);
-    const isMeet  = isMeta && countsAsMetaMeeting(d.stage, d.origem);
-    const isSign  = isMeta && countsAsMetaSignature(d.stage, d.origem);
+    const isMeta  = skipOriginFilter || isMetaOrigin(d.origem);
+    const stageOk = META_MEETING_STAGES.some((ms) => normalizeKey(String(d.stage || "")).includes(ms));
+    const isMeet  = isMeta && stageOk;
+    const isSign  = isMeta && normalizeKey(String(d.stage || "")).includes("assinatura realizada");
 
     if (!isMeta && !seenMeet.has(uid)) {
       discarded.push({ nome: d.nomeNegocio, razao: `Origem não é META: "${d.origem}"` });
@@ -672,7 +677,7 @@ function renderCards(creatives) {
   // Fallback para stage-check quando o relatório não foi carregado (fluxo CSV).
   let reunioes, assinaturas;
   if (state.reunioesFiltered.length > 0) {
-    ({ reunioes, assinaturas } = computeReunioesReport(state.reunioesFiltered));
+    ({ reunioes, assinaturas } = computeReunioesReport(state.reunioesFiltered, { skipOriginFilter: state.isOfficialReunioesData }));
   } else if (state.reunioesRows.length > 0) {
     // Relatório carregado mas filtro de período retornou vazio → 0 no período selecionado
     reunioes = 0;
@@ -919,7 +924,7 @@ function renderCharts(creatives) {
 function _auditDashboard(cardMetrics) {
   let ovMeet = 0, ovSign = 0;
   if (state.reunioesFiltered.length > 0) {
-    ({ reunioes: ovMeet, assinaturas: ovSign } = computeReunioesReport(state.reunioesFiltered));
+    ({ reunioes: ovMeet, assinaturas: ovSign } = computeReunioesReport(state.reunioesFiltered, { skipOriginFilter: state.isOfficialReunioesData }));
   } else if (state.reunioesRows.length === 0) {
     const zohoBase = state.zohoFiltered.length > 0 ? state.zohoFiltered : state.zohoRows;
     ({ reunioes: ovMeet, assinaturas: ovSign } = computeZohoMetaMetrics(zohoBase));
@@ -1140,7 +1145,7 @@ function buildSlackPayload() {
   const leadsZohoHoje   = dealsToday.length;
   const reunioesBaseHoje = (state.reunioesRows.length > 0 ? state.reunioesRows : state.zohoRows)
     .filter((d) => isSameDay(d.horaCriacao, today));
-  const { reunioes: reunioesHoje, assinaturas: assinaturasHoje } = computeReunioesReport(reunioesBaseHoje);
+  const { reunioes: reunioesHoje, assinaturas: assinaturasHoje } = computeReunioesReport(reunioesBaseHoje, { skipOriginFilter: state.isOfficialReunioesData });
   const metaRowsHoje = state.metaRows.filter(
     (r) => (r.dataInicio && isSameDay(r.dataInicio, today)) || (r.dataFim && isSameDay(r.dataFim, today)) || (!r.dataInicio && !r.dataFim)
   );
@@ -1150,7 +1155,7 @@ function buildSlackPayload() {
   // Acumulado: totais do período filtrado (reunioesFiltered respeita o seletor de datas).
   // Fallback para Zoho CSV apenas quando o relatório Zoho não foi carregado.
   const { reunioes: reunioesTotais, assinaturas: assinaturaTotais } = state.reunioesFiltered.length > 0
-    ? computeReunioesReport(state.reunioesFiltered)
+    ? computeReunioesReport(state.reunioesFiltered, { skipOriginFilter: state.isOfficialReunioesData })
     : (state.reunioesRows.length > 0
       ? { reunioes: 0, assinaturas: 0 }
       : computeZohoMetaMetrics(state.zohoRows));
@@ -1634,7 +1639,7 @@ async function fetchAllData() {
     const [
       metaInsRes, metaLiveRes, zohoDealsRes,
       gadsDealsRes, gadsAccRes, gadsCamRes, gadsKwRes, gadsStRes,
-      slackMqlRes, metaDailyRes,
+      slackMqlRes, metaDailyRes, reunioesApiRes,
     ] = await Promise.allSettled([
       fetch(`/api/meta/insights?${params}`).then(r => r.json()),
       fetch(`/api/meta/live?${params}`).then(r => r.json()).catch(() => ({ ok: false })),
@@ -1646,13 +1651,15 @@ async function fetchAllData() {
       fetch(`/api/google-ads/search-terms?${params}`).then(r => r.json()).catch(() => ({ ok: false, data: [] })),
       fetch("/api/slack/mql").then(r => r.json()).catch(() => ({ ok: false, data: [] })),
       fetch(`/api/meta/live/daily?${params}`).then(r => r.json()).catch(() => ({ ok: false, data: [] })),
+      fetch("/api/zoho/reunioes").then(r => r.json()).catch(() => ({ ok: false, data: [] })),
     ]);
 
     const settled = (r) => r.status === "fulfilled" ? r.value : { ok: false, error: r.reason?.message, data: [] };
-    const metaIns   = settled(metaInsRes);
-    const metaLive  = settled(metaLiveRes);
-    const zoho      = settled(zohoDealsRes);
-    const gadsDeals = settled(gadsDealsRes);
+    const metaIns    = settled(metaInsRes);
+    const metaLive   = settled(metaLiveRes);
+    const zoho       = settled(zohoDealsRes);
+    const gadsDeals  = settled(gadsDealsRes);
+    const reunioesApi = settled(reunioesApiRes);
     const gadsAcc   = settled(gadsAccRes);
     const gadsCam   = settled(gadsCamRes);
     const gadsKw    = settled(gadsKwRes);
@@ -1716,6 +1723,14 @@ async function fetchAllData() {
       state.zohoRows      = zohoRows;
       state.zohoFiltered  = zohoRows;
       state.reunioesRows  = zohoRows;
+      state.isOfficialReunioesData = false;
+    }
+
+    // Relatório oficial de reuniões — substitui zohoRows como fonte de verdade para reuniões.
+    // Inclui deals [AT CG] com origem Meta Ads / Site PipeLovers excluídos do relatório Zoho.
+    if (reunioesApi.ok && Array.isArray(reunioesApi.data) && reunioesApi.data.length > 0) {
+      state.reunioesRows = zohoApiToRows(reunioesApi.data);
+      state.isOfficialReunioesData = true;
     }
 
     // Cruzamento Meta × Zoho → criativos
@@ -1762,7 +1777,7 @@ async function fetchAllData() {
     // Live Meta — métricas Zoho para a aba Live Meta
     let liveMetrics = null;
     if (metaLive.ok && Array.isArray(metaLive.data)) {
-      const { reunioes, assinaturas } = computeReunioesReport(reunioesForPeriod);
+      const { reunioes, assinaturas } = computeReunioesReport(reunioesForPeriod, { skipOriginFilter: state.isOfficialReunioesData });
       const { metaTotal }             = computeZohoMetaMetrics(zohoForPeriod);
       liveMetrics = { metaTotal, reunioes, assinaturas, ads: metaLive.data };
     }
