@@ -55,17 +55,57 @@ app.get("/api/zoho/deals", async (req, res) => {
 });
 
 // ── GET /api/zoho/reunioes ────────────────────────────────────────────────────
-// Busca o relatório "Reuniões geradas no mês" do Zoho Analytics.
-// Fonte de verdade para contagem de Reuniões Geradas META.
+// Busca o relatório "Reuniões geradas no mês" do Zoho Analytics e suplementa
+// com deals do mesmo mês que tenham origem em Meta Ads / Site PipeLovers mas
+// foram excluídos do relatório por filtro incorreto (ex: [AT CG] no nome).
 // ID configurável via ZOHO_REUNIOES_REPORT_ID no .env.
 app.get("/api/zoho/reunioes", async (req, res) => {
   try {
     if (!process.env.ZOHO_REFRESH_TOKEN || !process.env.ZOHO_CLIENT_ID) {
       return res.status(500).json({ error: "Credenciais Zoho não configuradas no .env" });
     }
-    const reportId = process.env.ZOHO_REUNIOES_REPORT_ID || "6959700000006160005";
-    const data     = await zohoService.getReport(reportId);
-    res.json({ ok: true, data });
+
+    const reportId  = process.env.ZOHO_REUNIOES_REPORT_ID || "6959700000006160005";
+    const [reportData, allDeals] = await Promise.all([
+      zohoService.getReport(reportId),
+      zohoService.getDeals(),
+    ]);
+
+    // Palavras-chave de origem que indicam lead do funil Meta Ads / Site PipeLovers
+    const ORIGIN_KW = [
+      "pipelovers", "tofu", "bofu",
+      "aula gratis", "aula grátis", "aulas gratis", "aulas grátis",
+      "levantada de mão", "levantada de mao",
+      "meta ads", "meta adds", "metaads",
+    ];
+
+    const normalize = (s) =>
+      String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+
+    const hasOrigin = (leadSource) => {
+      const src = normalize(leadSource);
+      return ORIGIN_KW.some((kw) => src.includes(kw));
+    };
+
+    // Primeiro dia do mês corrente (considera o mês do último registro do relatório se disponível)
+    const refDate     = reportData.length ? new Date(reportData[0].createdTime) : new Date();
+    const firstOfMonth = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
+    const lastOfMonth  = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0, 23, 59, 59);
+
+    const reportIds = new Set(reportData.map((r) => r.id));
+
+    const missing = allDeals.filter((d) => {
+      if (reportIds.has(d.id)) return false;
+      const created = new Date(d.createdTime);
+      if (created < firstOfMonth || created > lastOfMonth) return false;
+      return hasOrigin(d.leadSource);
+    });
+
+    if (missing.length) {
+      console.log(`[Zoho Reuniões] +${missing.length} deal(s) adicionados por origem (excluídos do relatório):`, missing.map((d) => d.dealName));
+    }
+
+    res.json({ ok: true, data: [...reportData, ...missing] });
   } catch (err) {
     console.error("[Zoho Reuniões]", err.message);
     res.status(502).json({ error: err.message });
