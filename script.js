@@ -3059,6 +3059,7 @@ const gadsState = {
   campaigns:   [],
   keywords:    [],
   searchTerms: [],
+  leads:       [],
   sortKey:     "costBRL",
   sortDir:     -1,
 };
@@ -3205,6 +3206,65 @@ function renderGadsSearchTerms() {
   `).join("");
 }
 
+function gadsLeadStageBadge(stage) {
+  const s = (stage || "").toLowerCase();
+  let bg = "rgba(120,120,120,0.12)", color = "var(--text-muted)";
+  if (s.includes("assinatura"))                         { bg = "rgba(31,174,120,0.15)";  color = "var(--green)"; }
+  else if (s.includes("reuniao realizada") || s.includes("reunião realizada")) { bg = "rgba(0,184,217,0.15)"; color = "#00b8d9"; }
+  else if (s.includes("reuniao agendada")  || s.includes("reunião agendada"))  { bg = "rgba(255,171,0,0.15)"; color = "#e6a817"; }
+  else if (s.includes("negociacao")        || s.includes("negociação"))        { bg = "rgba(255,128,0,0.15)"; color = "#e07030"; }
+  else if (s.includes("proposta"))                      { bg = "rgba(108,92,231,0.15)"; color = "var(--accent)"; }
+  else if (s.includes("mql"))                           { bg = "rgba(66,133,244,0.15)"; color = "#4285f4"; }
+  else if (s.includes("perdido") || s.includes("cancelado") || s.includes("fechado")) { bg = "rgba(220,60,60,0.15)"; color = "#dc3c3c"; }
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:600;background:${bg};color:${color};white-space:nowrap">${stage || "—"}</span>`;
+}
+
+function renderGadsLeadsTable(filter) {
+  const section = document.getElementById("gadsLeadsSection");
+  const tbody   = document.getElementById("gadsLeadsBody");
+  const empty   = document.getElementById("gadsLeadsEmpty");
+  const counter = document.getElementById("gadsLeadsCount");
+  if (!section || !tbody) return;
+
+  const leads = gadsState.leads || [];
+  const q     = (filter || "").toLowerCase().trim();
+  const shown = q
+    ? leads.filter(l =>
+        (l.nomeContato  || "").toLowerCase().includes(q) ||
+        (l.nomeNegocio  || "").toLowerCase().includes(q) ||
+        (l.stage        || "").toLowerCase().includes(q) ||
+        (l.origem       || "").toLowerCase().includes(q)
+      )
+    : leads;
+
+  if (!shown.length) {
+    tbody.innerHTML = "";
+    empty.style.display   = "";
+    section.style.display = "";
+    counter.textContent   = "";
+    return;
+  }
+
+  empty.style.display   = "none";
+  section.style.display = "";
+  counter.textContent   = `${shown.length} lead${shown.length !== 1 ? "s" : ""}`;
+
+  tbody.innerHTML = shown.map((l, i) => {
+    const dt = l.horaCriacao
+      ? l.horaCriacao.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+      : "—";
+    const rowBg = i % 2 === 0 ? "" : "background:var(--bg)";
+    return `
+      <tr style="${rowBg};border-bottom:1px solid var(--border)">
+        <td style="padding:9px 10px;color:var(--text)">${l.nomeContato || "—"}</td>
+        <td style="padding:9px 10px;color:var(--text-secondary)">${l.nomeNegocio || "—"}</td>
+        <td style="padding:9px 10px">${gadsLeadStageBadge(l.stage)}</td>
+        <td style="padding:9px 10px;color:var(--text-secondary);font-size:.79rem">${l.origem || "—"}</td>
+        <td style="padding:9px 10px;text-align:right;color:var(--text-muted);white-space:nowrap">${dt}</td>
+      </tr>`;
+  }).join("");
+}
+
 async function fetchGoogleAds() {
   const btn    = document.getElementById("gadsRefreshBtn");
   const status = document.getElementById("gadsStatus");
@@ -3238,6 +3298,7 @@ async function fetchGoogleAds() {
       id:          r.id || "",
       nomeNegocio: r.dealName || "",
       nomeContato: r.contactName || "",
+      origem:      r.leadSource || "",
       stage:       r.stage || "",
       horaCriacao: r.createdTime ? new Date(r.createdTime) : null,
     }));
@@ -3256,6 +3317,11 @@ async function fetchGoogleAds() {
     gadsState.campaigns   = camRes.ok ? (camRes.data || []) : [];
     gadsState.keywords    = kwRes.ok  ? (kwRes.data  || []) : [];
     gadsState.searchTerms = stRes.ok  ? (stRes.data  || []) : [];
+    gadsState.leads       = periodRows.slice().sort((a, b) => {
+      const ta = a.horaCriacao ? a.horaCriacao.getTime() : 0;
+      const tb = b.horaCriacao ? b.horaCriacao.getTime() : 0;
+      return tb - ta;
+    });
 
     renderGadsSummary();
     renderOverview();
@@ -3263,6 +3329,7 @@ async function fetchGoogleAds() {
     renderGadsCampaigns();
     renderGadsKeywords();
     renderGadsSearchTerms();
+    renderGadsLeadsTable();
 
     if (gadsState.summary) document.getElementById("gadsApiSummary").style.display = "grid";
     if (gadsState.campaigns.length) document.getElementById("gadsCampaignsSection").style.display = "";
@@ -3295,6 +3362,10 @@ document.getElementById("gadsPreset").addEventListener("change", (e) => {
 });
 
 document.getElementById("gadsCampaignSearch").addEventListener("input", renderGadsCampaigns);
+
+document.getElementById("gadsLeadsSearch").addEventListener("input", (e) => {
+  renderGadsLeadsTable(e.target.value);
+});
 
 document.querySelectorAll("#gadsCampaignsTable .gads-sortable").forEach(th => {
   th.addEventListener("click", () => {

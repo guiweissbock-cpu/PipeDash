@@ -601,6 +601,37 @@
       </div>
     </section>
 
+
+    <!-- ── Leads Google Ads ──────────────────────────────────────────────────── -->
+    <section class="card table-panel" id="gadsLeadsSection" style="display:none;margin-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <div>
+          <h3 style="margin:0 0 2px;font-size:1rem">👥 Leads Google Ads</h3>
+          <p style="margin:0;font-size:.78rem;color:var(--text-muted)">Leads do período selecionado com origem classificada como Google Ads</p>
+        </div>
+        <input type="text" id="gadsLeadsSearch" placeholder="🔍 Buscar lead, empresa ou estágio…"
+          style="font-size:.82rem;padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);width:260px;outline:none">
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+          <thead>
+            <tr style="background:var(--bg);border-bottom:2px solid var(--border)">
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Nome</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Empresa</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Estágio</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Origem</th>
+              <th style="text-align:right;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Criado em</th>
+            </tr>
+          </thead>
+          <tbody id="gadsLeadsBody"></tbody>
+        </table>
+      </div>
+      <div id="gadsLeadsEmpty" style="display:none;text-align:center;padding:28px 0;color:var(--text-muted);font-size:.85rem">
+        Nenhum lead Google Ads encontrado no período.
+      </div>
+      <p id="gadsLeadsCount" style="margin:10px 0 0;font-size:.76rem;color:var(--text-muted);text-align:right"></p>
+    </section>
+
   </div><!-- /tab googleads -->
 
   <!-- ── TAB: INSIGHTS IA ──────────────────────────────────────────────────── -->
