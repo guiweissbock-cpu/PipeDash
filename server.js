@@ -636,6 +636,46 @@ app.get("/api/webhooks/form-leads", (req, res) => {
   }
 });
 
+// ── GET /api/sheets/form-leads ────────────────────────────────────────────────
+// Retorna leads da planilha de atribuição do Google Sheets.
+// Cache de 5 min no servidor. Use ?refresh=1 para forçar.
+// Filtros opcionais: ?canal= &campanha= &email= &since=YYYY-MM-DD &until=YYYY-MM-DD
+app.get("/api/sheets/form-leads", async (req, res) => {
+  try {
+    const sheetsService = require("./services/sheetsService");
+    const forceRefresh  = req.query.refresh === "1";
+    let leads = await sheetsService.getLeads({ forceRefresh });
+
+    const { canal, campanha, email, since, until } = req.query;
+    if (canal)    leads = leads.filter(l => (l.channel || "").toLowerCase() === canal.toLowerCase());
+    if (campanha) leads = leads.filter(l => (l.campanha || "").toLowerCase().includes(campanha.toLowerCase()));
+    if (email)    leads = leads.filter(l => (l.email    || "").toLowerCase().includes(email.toLowerCase()));
+    if (since) {
+      const d = new Date(since);
+      leads = leads.filter(l => {
+        if (!l.data) return false;
+        const [day, mon, yearTime] = l.data.split("/");
+        const yr = (yearTime || "").split(" ")[0];
+        return new Date(`${yr}-${mon}-${day}`) >= d;
+      });
+    }
+    if (until) {
+      const d = new Date(until); d.setHours(23, 59, 59);
+      leads = leads.filter(l => {
+        if (!l.data) return false;
+        const [day, mon, yearTime] = l.data.split("/");
+        const yr = (yearTime || "").split(" ")[0];
+        return new Date(`${yr}-${mon}-${day}`) <= d;
+      });
+    }
+
+    res.json({ ok: true, count: leads.length, data: leads });
+  } catch (err) {
+    console.error("[Sheets]", err.message);
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
 // ── GET /api/status ───────────────────────────────────────────────────────────
 // Verifica quais integrações estão configuradas (sem expor os valores).
 app.get("/api/status", (_req, res) => {
