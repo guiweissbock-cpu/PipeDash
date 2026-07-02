@@ -1231,7 +1231,7 @@ function buildSlackMessageText(payload) {
 // REPORT DIÁRIO DE MÍDIA PAGA
 // =============================================================================
 
-// Metas fixas — junho 2026
+// Metas fixas — julho 2026
 const RP_ORCAMENTO              = 28000;
 const RP_META_REUNIOES_DIA      = 3;   // total (Google + Meta)
 const RP_META_FINAL_GOOGLE      = 40;
@@ -1244,10 +1244,10 @@ const RP_META_CLIQUES_DIA       = 215;
 const RP_META_LEADS_DIA         = 23;
 const RP_META_REUNIOES_DIA_META = 1;
 
-// Período de referência — junho 2026
-const RP_JUNE_START        = new Date(2026, 5, 1);   // 01/06/2026
-const RP_FERIADOS          = ["2026-06-04"];           // Corpus Christi (feriado)
-const RP_JUNHO_DIAS_UTEIS  = 21;                       // dias úteis totais do mês
+// Período de referência — julho 2026
+const RP_JULY_START        = new Date(2026, 6, 1);   // 01/07/2026
+const RP_FERIADOS          = [];                       // sem feriados nacionais em julho
+const RP_JULHO_DIAS_UTEIS  = 23;                       // dias úteis totais do mês
 
 function rpCountWorkingDays(from, to) {
   let count = 0;
@@ -1370,15 +1370,15 @@ async function generateDailyReport() {
   const today    = new Date(sy, sm - 1, sd);
   const todayEnd = new Date(sy, sm - 1, sd, 23, 59, 59, 999);
 
-  const juneStr   = "2026-06-01";
-  const diasUteis = rpCountWorkingDays(RP_JUNE_START, today); // dias úteis decorridos até hoje
+  const julyStr   = "2026-07-01";
+  const diasUteis = rpCountWorkingDays(RP_JULY_START, today); // dias úteis decorridos até hoje
 
-  // 4 chamadas paralelas: dia selecionado + acumulado junho até dia selecionado
+  // 4 chamadas paralelas: dia selecionado + acumulado julho até dia selecionado
   const [rMetaToday, rMetaMonth, rGadsToday, rGadsMonth] = await Promise.allSettled([
     fetch(`/api/meta/insights?level=account&since=${todayStr}&until=${todayStr}`).then(r => r.json()),
-    fetch(`/api/meta/insights?level=account&since=${juneStr}&until=${todayStr}`).then(r => r.json()),
+    fetch(`/api/meta/insights?level=account&since=${julyStr}&until=${todayStr}`).then(r => r.json()),
     fetch(`/api/google-ads/account?since=${todayStr}&until=${todayStr}`).then(r => r.json()),
-    fetch(`/api/google-ads/account?since=${juneStr}&until=${todayStr}`).then(r => r.json()),
+    fetch(`/api/google-ads/account?since=${julyStr}&until=${todayStr}`).then(r => r.json()),
   ]);
 
   const metaToday = rpSumRows(rMetaToday.status === "fulfilled" ? (rMetaToday.value?.data || []) : []);
@@ -1389,7 +1389,7 @@ async function generateDailyReport() {
   // Reuniões Zoho filtradas pela data selecionada
   const rRowsAll   = state.reunioesRows || [];
   const rRowsToday = rRowsAll.filter(d => d.horaCriacao && isSameDay(d.horaCriacao, today));
-  const rRowsMonth = rRowsAll.filter(d => d.horaCriacao && d.horaCriacao >= RP_JUNE_START && d.horaCriacao <= todayEnd);
+  const rRowsMonth = rRowsAll.filter(d => d.horaCriacao && d.horaCriacao >= RP_JULY_START && d.horaCriacao <= todayEnd);
 
   const gRowsToday      = rRowsToday.filter(d => isGoogleAdsOrigin(d.origem));
   const gRowsMonth      = rRowsMonth.filter(d => isGoogleAdsOrigin(d.origem));
@@ -4457,11 +4457,11 @@ function finGetAllCampaigns(cfg) {
 function finGetTimeInfo() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const monthEnd           = new Date(2026, 5, 30);
+  const monthEnd           = new Date(2026, 6, 31);
   const tomorrow           = new Date(today.getTime() + 86400000);
-  const diasUteis          = rpCountWorkingDays(RP_JUNE_START, today);
+  const diasUteis          = rpCountWorkingDays(RP_JULY_START, today);
   const diasUteisRestantes = rpCountWorkingDays(tomorrow, monthEnd);
-  const diasUteisTotal     = RP_JUNHO_DIAS_UTEIS; // 21 fixos — garante consistência com o reporte
+  const diasUteisTotal     = RP_JULHO_DIAS_UTEIS; // 23 fixos — garante consistência com o reporte
   return { diasUteis, diasUteisRestantes, diasUteisTotal };
 }
 
