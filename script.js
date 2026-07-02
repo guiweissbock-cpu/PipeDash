@@ -66,6 +66,7 @@ const state = {
   metaFile: null,
   zohoFile: null,
   isOfficialReunioesData: false, // true quando reunioesRows vem do relatório Zoho Analytics (não filtrar por isMetaOrigin)
+  formLeads: [],               // submissões do formulário recebidas via Pluga → /api/form-lead
 };
 
 // ---------------------------------------------------------------------------
@@ -869,6 +870,15 @@ function renderTable() {
 // ---------------------------------------------------------------------------
 // RENDERIZAÇÃO: LEADS POR CANAL
 // ---------------------------------------------------------------------------
+
+// Mapeia o canal classificado pelo formLeadsService para a chave do filtro do frontend.
+function canalKey(channel) {
+  const c = (channel || "").toLowerCase();
+  if (c === "google ads") return "google";
+  if (c === "meta ads")   return "meta";
+  return "outro";
+}
+
 function renderLeadsByChannel() {
   const panel   = document.getElementById("leadsChannelPanel");
   const tbody   = document.getElementById("leadsChannelBody");
@@ -878,41 +888,71 @@ function renderLeadsByChannel() {
   const channelFilter = (document.getElementById("leadsChannelFilter")?.value || "all");
   const q = normalizeKey(document.getElementById("leadsChannelSearch")?.value || "");
 
-  // Usa reunioesFiltered (período selecionado) quando disponível
-  const source = (state.reunioesFiltered && state.reunioesFiltered.length > 0)
-    ? state.reunioesFiltered
-    : state.reunioesRows;
+  // Fonte: leads do formulário (Pluga) se disponíveis; fallback para Zoho (sem UTM)
+  const useFormLeads = state.formLeads && state.formLeads.length > 0;
 
-  if (!source || source.length === 0) {
+  let allLeads;
+
+  if (useFormLeads) {
+    // Dados vindos do formulário via Pluga — têm UTM mas estágio vem do Zoho (futuro)
+    allLeads = state.formLeads.map(lead => {
+      const canal = lead.channel || "Direto";
+      return {
+        nomeContato:  lead.full_name   || lead.email || "—",
+        nomeNegocio:  lead.company_name|| "",
+        stage:        "",
+        canal,
+        canalKey:     canalKey(canal),
+        origem:       lead.utm_source  || lead.utm_medium || "—",
+        campanha:     lead.utm_campaign|| "—",
+        anuncio:      lead.utm_content || "—",
+        keyword:      lead.utm_keyword || lead.searchterm || "—",
+        horaCriacao:  lead.received_at ? new Date(lead.received_at) : null,
+      };
+    });
+  } else {
+    // Fallback: Zoho deals (sem dados UTM)
+    const source = (state.reunioesFiltered && state.reunioesFiltered.length > 0)
+      ? state.reunioesFiltered
+      : state.reunioesRows;
+
+    if (!source || source.length === 0) {
+      panel.hidden = true;
+      return;
+    }
+
+    allLeads = source
+      .map(r => {
+        const isMeta   = isMetaOrigin(r.origem);
+        const isGoogle = isGoogleAdsOrigin(r.origem);
+        if (!isMeta && !isGoogle) return null;
+        return {
+          nomeContato:  r.nomeContato || "—",
+          nomeNegocio:  r.nomeNegocio || "",
+          stage:        r.stage || "",
+          canal:        isMeta ? "Meta Ads" : "Google Ads",
+          canalKey:     isMeta ? "meta" : "google",
+          origem:       r.origem || "—",
+          campanha:     "—",
+          anuncio:      "—",
+          keyword:      "—",
+          horaCriacao:  r.horaCriacao || null,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  // Ordena: mais recentes primeiro
+  allLeads.sort((a, b) => {
+    const ta = a.horaCriacao ? a.horaCriacao.getTime() : 0;
+    const tb = b.horaCriacao ? b.horaCriacao.getTime() : 0;
+    return tb - ta;
+  });
+
+  if (!allLeads.length) {
     panel.hidden = true;
     return;
   }
-
-  // Classifica cada linha como Meta ou Google
-  const allLeads = source
-    .map(r => {
-      const isMeta   = isMetaOrigin(r.origem);
-      const isGoogle = isGoogleAdsOrigin(r.origem);
-      if (!isMeta && !isGoogle) return null;
-      return {
-        nomeContato:   r.nomeContato || "—",
-        nomeNegocio:   r.nomeNegocio || "",
-        stage:         r.stage || "",
-        canal:         isMeta ? "Meta Ads" : "Google Ads",
-        canalKey:      isMeta ? "meta" : "google",
-        origem:        r.origem || "—",
-        campanha:      r.metaAdsCampanha || "—",
-        anuncio:       r.metaAdsAnuncio  || "—",
-        keyword:       "—",   // não disponível na pipeline atual
-        horaCriacao:   r.horaCriacao || null,
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => {
-      const ta = a.horaCriacao ? a.horaCriacao.getTime() : 0;
-      const tb = b.horaCriacao ? b.horaCriacao.getTime() : 0;
-      return tb - ta;
-    });
 
   // Filtra por canal e busca de texto
   const shown = allLeads.filter(l => {
@@ -1737,7 +1777,7 @@ async function fetchAllData() {
     const [
       metaInsRes, metaLiveRes, zohoDealsRes,
       gadsDealsRes, gadsAccRes, gadsCamRes, gadsKwRes, gadsStRes,
-      slackMqlRes, metaDailyRes, reunioesApiRes,
+      slackMqlRes, metaDailyRes, reunioesApiRes, formLeadsRes,
     ] = await Promise.allSettled([
       fetch(`/api/meta/insights?${params}`).then(r => r.json()),
       fetch(`/api/meta/live?${params}`).then(r => r.json()).catch(() => ({ ok: false })),
@@ -1750,6 +1790,7 @@ async function fetchAllData() {
       fetch("/api/slack/mql").then(r => r.json()).catch(() => ({ ok: false, data: [] })),
       fetch(`/api/meta/live/daily?${params}`).then(r => r.json()).catch(() => ({ ok: false, data: [] })),
       fetch("/api/zoho/reunioes").then(r => r.json()).catch(() => ({ ok: false, data: [] })),
+      fetch("/api/webhooks/form-leads").then(r => r.json()).catch(() => ({ ok: false, data: [] })),
     ]);
 
     const settled = (r) => r.status === "fulfilled" ? r.value : { ok: false, error: r.reason?.message, data: [] };
@@ -1758,6 +1799,7 @@ async function fetchAllData() {
     const zoho       = settled(zohoDealsRes);
     const gadsDeals  = settled(gadsDealsRes);
     const reunioesApi = settled(reunioesApiRes);
+    const formLeadsApi = settled(formLeadsRes);
     const gadsAcc   = settled(gadsAccRes);
     const gadsCam   = settled(gadsCamRes);
     const gadsKw    = settled(gadsKwRes);
@@ -1829,6 +1871,11 @@ async function fetchAllData() {
     if (reunioesApi.ok && Array.isArray(reunioesApi.data) && reunioesApi.data.length > 0) {
       state.reunioesRows = zohoApiToRows(reunioesApi.data);
       state.isOfficialReunioesData = true;
+    }
+
+    // Leads do formulário (recebidos via Pluga → POST /api/form-lead)
+    if (formLeadsApi.ok && Array.isArray(formLeadsApi.data)) {
+      state.formLeads = formLeadsApi.data;
     }
 
     // Cruzamento Meta × Zoho → criativos

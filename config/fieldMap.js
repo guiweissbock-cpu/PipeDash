@@ -21,4 +21,5 @@ module.exports = {
 
   // Campo ICP
   icp: "ICP",
+
 };
