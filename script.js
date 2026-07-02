@@ -867,6 +867,100 @@ function renderTable() {
 }
 
 // ---------------------------------------------------------------------------
+// RENDERIZAÇÃO: LEADS POR CANAL
+// ---------------------------------------------------------------------------
+function renderLeadsByChannel() {
+  const panel   = document.getElementById("leadsChannelPanel");
+  const tbody   = document.getElementById("leadsChannelBody");
+  const counter = document.getElementById("leadsChannelCount");
+  if (!panel || !tbody) return;
+
+  const channelFilter = (document.getElementById("leadsChannelFilter")?.value || "all");
+  const q = normalizeKey(document.getElementById("leadsChannelSearch")?.value || "");
+
+  // Usa reunioesFiltered (período selecionado) quando disponível
+  const source = (state.reunioesFiltered && state.reunioesFiltered.length > 0)
+    ? state.reunioesFiltered
+    : state.reunioesRows;
+
+  if (!source || source.length === 0) {
+    panel.hidden = true;
+    return;
+  }
+
+  // Classifica cada linha como Meta ou Google
+  const allLeads = source
+    .map(r => {
+      const isMeta   = isMetaOrigin(r.origem);
+      const isGoogle = isGoogleAdsOrigin(r.origem);
+      if (!isMeta && !isGoogle) return null;
+      return {
+        nomeContato:   r.nomeContato || "—",
+        nomeNegocio:   r.nomeNegocio || "",
+        stage:         r.stage || "",
+        canal:         isMeta ? "Meta Ads" : "Google Ads",
+        canalKey:      isMeta ? "meta" : "google",
+        origem:        r.origem || "—",
+        campanha:      r.metaAdsCampanha || "—",
+        anuncio:       r.metaAdsAnuncio  || "—",
+        keyword:       "—",   // não disponível na pipeline atual
+        horaCriacao:   r.horaCriacao || null,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const ta = a.horaCriacao ? a.horaCriacao.getTime() : 0;
+      const tb = b.horaCriacao ? b.horaCriacao.getTime() : 0;
+      return tb - ta;
+    });
+
+  // Filtra por canal e busca de texto
+  const shown = allLeads.filter(l => {
+    if (channelFilter !== "all" && l.canalKey !== channelFilter) return false;
+    if (!q) return true;
+    return normalizeKey(l.nomeContato).includes(q) ||
+           normalizeKey(l.nomeNegocio).includes(q) ||
+           normalizeKey(l.stage).includes(q)       ||
+           normalizeKey(l.campanha).includes(q)    ||
+           normalizeKey(l.anuncio).includes(q)     ||
+           normalizeKey(l.origem).includes(q);
+  });
+
+  panel.hidden = false;
+  counter.textContent = `${shown.length} lead${shown.length !== 1 ? "s" : ""}`;
+
+  if (!shown.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">Nenhum lead encontrado.</td></tr>`;
+    return;
+  }
+
+  const CANAL_BADGE = {
+    "Meta Ads":   { bg: "rgba(24,119,242,0.12)", color: "#1877f2" },
+    "Google Ads": { bg: "rgba(66,133,244,0.12)", color: "#4285f4" },
+  };
+
+  tbody.innerHTML = shown.map((l, i) => {
+    const dt = l.horaCriacao
+      ? l.horaCriacao.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+      : "—";
+    const cb   = CANAL_BADGE[l.canal] || { bg: "rgba(120,120,120,0.12)", color: "var(--text-muted)" };
+    const rowBg = i % 2 === 0 ? "" : "background:var(--bg)";
+    return `<tr style="${rowBg};border-bottom:1px solid var(--border)">
+      <td style="padding:9px 10px;color:var(--text)">${escapeHtml(l.nomeContato)}</td>
+      <td style="padding:9px 10px">${gadsLeadStageBadge(l.stage)}</td>
+      <td style="padding:9px 10px">
+        <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:600;background:${cb.bg};color:${cb.color};white-space:nowrap">${l.canal}</span>
+      </td>
+      <td style="padding:9px 10px;color:var(--text-secondary);font-size:.79rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(l.origem)}">${escapeHtml(l.origem)}</td>
+      <td style="padding:9px 10px;color:var(--text-secondary);font-size:.79rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(l.campanha)}">${escapeHtml(l.campanha)}</td>
+      <td style="padding:9px 10px;color:var(--text-secondary);font-size:.79rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(l.anuncio)}">${escapeHtml(l.anuncio)}</td>
+      <td style="padding:9px 10px;color:var(--text-muted);font-size:.79rem">${l.keyword}</td>
+      <td style="padding:9px 10px;text-align:right;color:var(--text-muted);white-space:nowrap">${dt}</td>
+    </tr>`;
+  }).join("");
+}
+
+// ---------------------------------------------------------------------------
 // RENDERIZAÇÃO: GRÁFICOS (Chart.js)
 // ---------------------------------------------------------------------------
 const CHART_PALETTE = ["#6c5ce7", "#8b7bff", "#2ecc8f", "#f5b942", "#ff6b6b", "#4fb6e8", "#d98a4b", "#9aa4b8"];
@@ -950,6 +1044,7 @@ function renderAll() {
   renderRankings(creatives);
   renderInsights(creatives);
   renderTable();
+  renderLeadsByChannel();
   renderCharts(creatives);
 
   const hasData = state.creatives.length > 0;
@@ -1055,6 +1150,9 @@ document.getElementById("clearFiltersBtn").addEventListener("click", () => {
 );
 document.getElementById("filterCriativo").addEventListener("input", debounce(applyFilters, 250));
 document.getElementById("tableSearch").addEventListener("input", debounce(renderTable, 200));
+
+document.getElementById("leadsChannelSearch").addEventListener("input",  debounce(renderLeadsByChannel, 200));
+document.getElementById("leadsChannelFilter").addEventListener("change", renderLeadsByChannel);
 
 document.querySelectorAll("#mainTable thead th").forEach((th) => {
   th.addEventListener("click", () => {
