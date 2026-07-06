@@ -872,6 +872,223 @@ function renderTable() {
 // RENDERIZAÇÃO: LEADS POR CANAL
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// LEADS POR CANAL — FILTRO / ORDENAÇÃO POR COLUNA (estilo Google Sheets)
+// ---------------------------------------------------------------------------
+const LC_COLS = [
+  { key: "nome",            label: "Nome" },
+  { key: "email",           label: "E-mail" },
+  { key: "empresa",         label: "Empresa" },
+  { key: "nomeNegocio",     label: "Negócio" },
+  { key: "stage",           label: "Estágio" },
+  { key: "canal",           label: "Canal" },
+  { key: "origem",          label: "Origem" },
+  { key: "campanha",        label: "Campanha" },
+  { key: "keyword",         label: "Palavra-chave" },
+  { key: "anuncio",         label: "Anúncio" },
+  { key: "nomeFormulario",  label: "Formulário" },
+  { key: "paginaConversao", label: "Página" },
+  { key: "data",            label: "Data" },
+  { key: "gclid",           label: "GCLID" },
+  { key: "gbraid",          label: "GBRAID" },
+];
+
+const lcFilter = {
+  sortCol: null,  // colKey ou null
+  sortDir: null,  // "asc" | "desc" | null
+  colFilters: {}, // { colKey: Set<string> } — ausente = sem filtro
+};
+
+let lcCurrentLeads = [];  // leads após filtro de canal + busca, antes dos filtros de coluna
+let lcDdState = null;     // { colKey, tempSelected: Set, allValues: string[] }
+
+function lcVal(lead, key) {
+  return String(lead[key] ?? "—");
+}
+
+function lcApplyFiltersAndSort(leads) {
+  let result = leads;
+  for (const [key, sel] of Object.entries(lcFilter.colFilters)) {
+    if (!sel || sel.size === 0) continue;
+    result = result.filter(l => sel.has(lcVal(l, key)));
+  }
+  if (lcFilter.sortCol) {
+    const key = lcFilter.sortCol;
+    const dir = lcFilter.sortDir === "asc" ? 1 : -1;
+    result = [...result].sort((a, b) =>
+      dir * lcVal(a, key).localeCompare(lcVal(b, key), "pt-BR", { numeric: true, sensitivity: "base" }));
+  }
+  return result;
+}
+
+function updateLCHeaderIndicators() {
+  LC_COLS.forEach(({ key }) => {
+    const ind = document.getElementById(`lc-ind-${key}`);
+    if (!ind) return;
+    let html = "";
+    if (lcFilter.sortCol === key)
+      html += `<span class="lc-th-sort">${lcFilter.sortDir === "asc" ? "↑" : "↓"}</span>`;
+    if (lcFilter.colFilters[key]?.size)
+      html += `<span class="lc-th-filter">▼</span>`;
+    ind.innerHTML = html;
+  });
+}
+
+function renderLCValueList(search = "") {
+  const list = document.getElementById("lc-values-list");
+  if (!list || !lcDdState) return;
+  const { allValues, tempSelected } = lcDdState;
+  const q = search.trim().toLowerCase();
+  const visible = q ? allValues.filter(v => v.toLowerCase().includes(q)) : allValues;
+  list.innerHTML = visible.map(v =>
+    `<label class="lc-value-item">
+      <input type="checkbox" value="${escapeHtml(v)}"${tempSelected.has(v) ? " checked" : ""}>
+      <span title="${escapeHtml(v)}">${escapeHtml(v)}</span>
+    </label>`).join("");
+}
+
+function openLCDropdown(colKey, thEl) {
+  const dd = document.getElementById("lc-dropdown");
+  if (!dd) return;
+
+  // Alterna: clicou na mesma coluna já aberta → fecha
+  if (lcDdState?.colKey === colKey) { closeLCDropdown(false); return; }
+
+  const allValues = [...new Set(lcCurrentLeads.map(l => lcVal(l, colKey)))]
+    .sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true, sensitivity: "base" }));
+  const existing = lcFilter.colFilters[colKey];
+  const tempSelected = existing ? new Set(existing) : new Set(allValues);
+
+  lcDdState = { colKey, tempSelected, allValues };
+
+  dd.querySelectorAll(".lc-sort-btn").forEach(btn => {
+    btn.classList.toggle("active", lcFilter.sortCol === colKey && lcFilter.sortDir === btn.dataset.dir);
+  });
+  dd.querySelector(".lc-dd-search").value = "";
+  renderLCValueList();
+
+  // Posiciona abaixo do th
+  const rect = thEl.getBoundingClientRect();
+  dd.style.top  = `${rect.bottom + 4}px`;
+  dd.style.left = `${Math.min(rect.left, window.innerWidth - 304)}px`;
+  dd.classList.add("open");
+}
+
+function closeLCDropdown(apply) {
+  const dd = document.getElementById("lc-dropdown");
+  if (dd) dd.classList.remove("open");
+  if (apply && lcDdState) {
+    const { colKey, tempSelected, allValues } = lcDdState;
+    if (!tempSelected.size || tempSelected.size >= allValues.length) {
+      delete lcFilter.colFilters[colKey];
+    } else {
+      lcFilter.colFilters[colKey] = new Set(tempSelected);
+    }
+    updateLCHeaderIndicators();
+    renderLeadsByChannel();
+  }
+  lcDdState = null;
+}
+
+function initLeadsChannelFilter() {
+  const thead = document.querySelector("#leadsChannelTable thead tr");
+  if (!thead || thead.dataset.lcInit) return;
+  thead.dataset.lcInit = "1";
+
+  // Substitui conteúdo de cada th por botão com indicador
+  thead.querySelectorAll("th").forEach((th, i) => {
+    const col = LC_COLS[i];
+    if (!col) return;
+    th.innerHTML = `<button class="lc-th-btn" data-col="${col.key}">
+      <span>${col.label}</span><span class="lc-th-ind" id="lc-ind-${col.key}"></span>
+    </button>`;
+  });
+
+  // Cria dropdown singleton
+  const dd = document.createElement("div");
+  dd.id = "lc-dropdown";
+  dd.innerHTML = `
+    <div class="lc-dd-sort">
+      <button class="lc-sort-btn" data-dir="asc">↑&nbsp; Ordem crescente</button>
+      <button class="lc-sort-btn" data-dir="desc">↓&nbsp; Ordem decrescente</button>
+    </div>
+    <div class="lc-dd-values">
+      <div class="lc-dd-ctrl">
+        <button class="lc-ctrl-btn" id="lc-sel-all">Selecionar tudo</button>
+        <button class="lc-ctrl-btn" id="lc-sel-none">Limpar</button>
+      </div>
+      <input type="text" class="lc-dd-search" placeholder="Buscar valor…" autocomplete="off">
+      <div class="lc-values-list" id="lc-values-list"></div>
+    </div>
+    <div class="lc-dd-footer">
+      <button class="lc-btn-cancel" id="lc-btn-cancel">Cancelar</button>
+      <button class="lc-btn-ok" id="lc-btn-ok">OK</button>
+    </div>`;
+  document.body.appendChild(dd);
+
+  // Ordenação
+  dd.querySelectorAll(".lc-sort-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      if (!lcDdState) return;
+      const dir = btn.dataset.dir;
+      const same = lcFilter.sortCol === lcDdState.colKey && lcFilter.sortDir === dir;
+      lcFilter.sortCol = same ? null : lcDdState.colKey;
+      lcFilter.sortDir = same ? null : dir;
+      closeLCDropdown(true);
+    });
+  });
+
+  // Selecionar tudo / Limpar
+  document.getElementById("lc-sel-all").addEventListener("click", e => {
+    e.stopPropagation();
+    if (!lcDdState) return;
+    lcDdState.tempSelected = new Set(lcDdState.allValues);
+    renderLCValueList(dd.querySelector(".lc-dd-search").value);
+  });
+  document.getElementById("lc-sel-none").addEventListener("click", e => {
+    e.stopPropagation();
+    if (!lcDdState) return;
+    lcDdState.tempSelected = new Set();
+    renderLCValueList(dd.querySelector(".lc-dd-search").value);
+  });
+
+  // Busca dentro do dropdown
+  dd.querySelector(".lc-dd-search").addEventListener("input", e => {
+    e.stopPropagation();
+    renderLCValueList(e.target.value);
+  });
+  dd.querySelector(".lc-dd-search").addEventListener("click", e => e.stopPropagation());
+
+  // Checkboxes (event delegation)
+  document.getElementById("lc-values-list").addEventListener("change", e => {
+    if (e.target.type !== "checkbox" || !lcDdState) return;
+    e.stopPropagation();
+    e.target.checked
+      ? lcDdState.tempSelected.add(e.target.value)
+      : lcDdState.tempSelected.delete(e.target.value);
+  });
+
+  // OK / Cancelar
+  document.getElementById("lc-btn-ok").addEventListener("click",     e => { e.stopPropagation(); closeLCDropdown(true);  });
+  document.getElementById("lc-btn-cancel").addEventListener("click", e => { e.stopPropagation(); closeLCDropdown(false); });
+
+  // Click no th abre dropdown
+  thead.addEventListener("click", e => {
+    const btn = e.target.closest(".lc-th-btn");
+    if (!btn) return;
+    openLCDropdown(btn.dataset.col, btn.closest("th"));
+  });
+
+  // Fecha ao clicar fora
+  document.addEventListener("click", e => {
+    if (!lcDdState) return;
+    if (!dd.contains(e.target) && !e.target.closest(".lc-th-btn"))
+      closeLCDropdown(false);
+  }, true);
+}
+
+// ---------------------------------------------------------------------------
 // Mapeia o canal classificado pelo formLeadsService para a chave do filtro do frontend.
 function canalKey(channel) {
   const c = (channel || "").toLowerCase();
@@ -997,13 +1214,15 @@ function renderLeadsByChannel() {
       .filter(Boolean);
   }
 
-  // Ordena mais recentes primeiro
-  allLeads.sort((a, b) => (b.horaCriacao?.getTime() || 0) - (a.horaCriacao?.getTime() || 0));
+  // Ordena mais recentes primeiro (padrão quando não há ordenação por coluna ativa)
+  if (!lcFilter.sortCol) {
+    allLeads.sort((a, b) => (b.horaCriacao?.getTime() || 0) - (a.horaCriacao?.getTime() || 0));
+  }
 
   if (!allLeads.length) { panel.hidden = true; return; }
 
   // Filtra por canal e busca de texto
-  const shown = allLeads.filter(l => {
+  const preFiltered = allLeads.filter(l => {
     if (channelFilter !== "all" && l.canalKey !== channelFilter) return false;
     if (!q) return true;
     return normalizeKey(l.nome).includes(q)     ||
@@ -1014,6 +1233,12 @@ function renderLeadsByChannel() {
            normalizeKey(l.anuncio).includes(q)  ||
            normalizeKey(l.canal).includes(q);
   });
+
+  // Disponibiliza para o dropdown de filtro de coluna
+  lcCurrentLeads = preFiltered;
+
+  // Aplica filtros e sort por coluna
+  const shown = lcApplyFiltersAndSort(preFiltered);
 
   panel.hidden = false;
   counter.textContent = `${shown.length} lead${shown.length !== 1 ? "s" : ""}`;
@@ -1059,6 +1284,8 @@ function renderLeadsByChannel() {
       ${tdM(l.gbraid !== "—" ? l.gbraid.slice(0, 12) + "…" : "—")}
     </tr>`;
   }).join("");
+
+  updateLCHeaderIndicators();
 }
 
 // ---------------------------------------------------------------------------
@@ -1254,6 +1481,7 @@ document.getElementById("tableSearch").addEventListener("input", debounce(render
 
 document.getElementById("leadsChannelSearch").addEventListener("input",  debounce(renderLeadsByChannel, 200));
 document.getElementById("leadsChannelFilter").addEventListener("change", renderLeadsByChannel);
+initLeadsChannelFilter();
 
 document.querySelectorAll("#mainTable thead th").forEach((th) => {
   th.addEventListener("click", () => {
