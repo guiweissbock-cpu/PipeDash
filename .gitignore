@@ -12,6 +12,9 @@ slack_mql_cache.json
 # Estado de runtime (quota tracker — não versionar)
 _quota_state.json
 
+# Leads do formulário (cache local — não versionar)
+data/form_leads.json
+
 # Backups locais (nunca versionar)
 backups/
 

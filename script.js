@@ -66,6 +66,8 @@ const state = {
   metaFile: null,
   zohoFile: null,
   isOfficialReunioesData: false, // true quando reunioesRows vem do relatório Zoho Analytics (não filtrar por isMetaOrigin)
+  formLeads: [],               // submissões do formulário recebidas via Pluga → /api/webhooks/form-lead
+  sheetLeads: [],              // leads da planilha de atribuição → /api/sheets/form-leads
 };
 
 // ---------------------------------------------------------------------------
@@ -867,6 +869,199 @@ function renderTable() {
 }
 
 // ---------------------------------------------------------------------------
+// RENDERIZAÇÃO: LEADS POR CANAL
+// ---------------------------------------------------------------------------
+
+// Mapeia o canal classificado pelo formLeadsService para a chave do filtro do frontend.
+function canalKey(channel) {
+  const c = (channel || "").toLowerCase();
+  if (c === "google ads") return "google";
+  if (c === "meta ads")   return "meta";
+  return "outro";
+}
+
+function renderLeadsByChannel() {
+  const panel   = document.getElementById("leadsChannelPanel");
+  const tbody   = document.getElementById("leadsChannelBody");
+  const counter = document.getElementById("leadsChannelCount");
+  if (!panel || !tbody) return;
+
+  const channelFilter = (document.getElementById("leadsChannelFilter")?.value || "all");
+  const q = normalizeKey(document.getElementById("leadsChannelSearch")?.value || "");
+
+  // ── Fonte primária: planilha de atribuição ─────────────────────────────────
+  // Fallback: webhook Pluga → Zoho (sem dados UTM)
+  const source = state.sheetLeads?.length  ? "sheet"
+               : state.formLeads?.length   ? "form"
+               : "zoho";
+
+  if (source === "zoho") {
+    const zohoSrc = (state.reunioesFiltered?.length ? state.reunioesFiltered : state.reunioesRows) || [];
+    if (!zohoSrc.length) { panel.hidden = true; return; }
+  }
+
+  // ── Monta lookup Zoho: nome normalizado → { stage, nomeNegocio } ──────────
+  // Usado para enriquecer o estágio e negócio dos leads da planilha
+  const zohoByName = new Map();
+  for (const r of [...(state.reunioesRows || []), ...(state.zohoRows || [])]) {
+    const k = normalizeKey(r.nomeContato || "");
+    if (k && !zohoByName.has(k)) zohoByName.set(k, { stage: r.stage || "", nomeNegocio: r.nomeNegocio || "" });
+  }
+
+  // ── Gera lista de leads a exibir ──────────────────────────────────────────
+  let allLeads = [];
+
+  if (source === "sheet") {
+    allLeads = state.sheetLeads.map(lead => {
+      const ck    = canalKey(lead.channel);
+      const nameK = normalizeKey(lead.nome);
+      const zoho  = zohoByName.get(nameK) || null;
+      const dataTs = lead.data
+        ? (() => { try { const [d,m,yh] = lead.data.split("/"); const y = (yh||"").split(" ")[0]; return new Date(`${y}-${m}-${d}`); } catch(_){return null;} })()
+        : null;
+      return {
+        nome:           lead.nome           || "—",
+        email:          lead.email          || "—",
+        empresa:        lead.empresa        || "—",
+        nomeNegocio:    zoho?.nomeNegocio   || "",
+        stage:          zoho?.stage         || "",
+        canal:          lead.channel        || "—",
+        canalKey:       ck,
+        origem:         lead.origem         || "—",
+        campanha:       lead.campanha       || "—",
+        keyword:        lead.keyword        || "—",
+        anuncio:        lead.anuncio        || "—",
+        nomeFormulario: lead.nomeFormulario || "—",
+        paginaConversao:lead.paginaConversao|| "—",
+        data:           lead.data           || "—",
+        gclid:          lead.gclid          || "—",
+        gbraid:         lead.gbraid         || "—",
+        horaCriacao:    dataTs,
+      };
+    });
+
+  } else if (source === "form") {
+    allLeads = state.formLeads.map(lead => {
+      const canal = lead.channel || "Direto";
+      const nameK = normalizeKey(lead.full_name || "");
+      const zoho  = zohoByName.get(nameK) || null;
+      return {
+        nome:           lead.full_name    || lead.email || "—",
+        email:          lead.email        || "—",
+        empresa:        lead.company_name || "—",
+        nomeNegocio:    zoho?.nomeNegocio || "",
+        stage:          zoho?.stage       || "",
+        canal,
+        canalKey:       canalKey(canal),
+        origem:         lead.utm_source   || "—",
+        campanha:       lead.utm_campaign || "—",
+        keyword:        lead.utm_keyword  || lead.searchterm || "—",
+        anuncio:        lead.utm_content  || "—",
+        nomeFormulario: lead.form_name    || "—",
+        paginaConversao:lead.page_url     || "—",
+        data:           lead.received_at  ? lead.received_at.slice(0, 10) : "—",
+        gclid:          lead.gclid        || "—",
+        gbraid:         lead.gbraid       || "—",
+        horaCriacao:    lead.received_at  ? new Date(lead.received_at) : null,
+      };
+    });
+
+  } else {
+    // Fallback Zoho — sem dados UTM
+    const zohoSrc = (state.reunioesFiltered?.length ? state.reunioesFiltered : state.reunioesRows) || [];
+    allLeads = zohoSrc
+      .map(r => {
+        const isMeta   = isMetaOrigin(r.origem);
+        const isGoogle = isGoogleAdsOrigin(r.origem);
+        if (!isMeta && !isGoogle) return null;
+        return {
+          nome:           r.nomeContato || "—",
+          email:          "—",
+          empresa:        "—",
+          nomeNegocio:    r.nomeNegocio || "",
+          stage:          r.stage       || "",
+          canal:          isMeta ? "Meta Ads" : "Google Ads",
+          canalKey:       isMeta ? "meta" : "google",
+          origem:         r.origem || "—",
+          campanha:       "—",
+          keyword:        "—",
+          anuncio:        "—",
+          nomeFormulario: "—",
+          paginaConversao:"—",
+          data:           r.horaCriacao ? r.horaCriacao.toLocaleDateString("pt-BR") : "—",
+          gclid:          "—",
+          gbraid:         "—",
+          horaCriacao:    r.horaCriacao || null,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  // Ordena mais recentes primeiro
+  allLeads.sort((a, b) => (b.horaCriacao?.getTime() || 0) - (a.horaCriacao?.getTime() || 0));
+
+  if (!allLeads.length) { panel.hidden = true; return; }
+
+  // Filtra por canal e busca de texto
+  const shown = allLeads.filter(l => {
+    if (channelFilter !== "all" && l.canalKey !== channelFilter) return false;
+    if (!q) return true;
+    return normalizeKey(l.nome).includes(q)     ||
+           normalizeKey(l.email).includes(q)    ||
+           normalizeKey(l.empresa).includes(q)  ||
+           normalizeKey(l.campanha).includes(q) ||
+           normalizeKey(l.keyword).includes(q)  ||
+           normalizeKey(l.anuncio).includes(q)  ||
+           normalizeKey(l.canal).includes(q);
+  });
+
+  panel.hidden = false;
+  counter.textContent = `${shown.length} lead${shown.length !== 1 ? "s" : ""}`;
+
+  if (!shown.length) {
+    tbody.innerHTML = `<tr><td colspan="15" style="text-align:center;color:var(--text-muted);padding:24px">Nenhum lead encontrado.</td></tr>`;
+    return;
+  }
+
+  const CANAL_BADGE = {
+    "Meta Ads":   { bg: "rgba(24,119,242,0.12)", color: "#1877f2" },
+    "Google Ads": { bg: "rgba(66,133,244,0.12)", color: "#4285f4" },
+    "Orgânico":   { bg: "rgba(46,204,143,0.12)", color: "#2ecc8f" },
+  };
+  const td  = (val, extra = "") =>
+    `<td style="padding:8px 10px;color:var(--text-secondary);font-size:.79rem;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis${extra}" title="${escapeHtml(String(val || "—"))}">${escapeHtml(String(val || "—"))}</td>`;
+  const tdM = (val, extra = "") =>
+    `<td style="padding:8px 10px;color:var(--text-muted);font-size:.76rem;white-space:nowrap${extra}" title="${escapeHtml(String(val || "—"))}">${escapeHtml(String(val || "—"))}</td>`;
+
+  tbody.innerHTML = shown.map((l, i) => {
+    const cb     = CANAL_BADGE[l.canal] || { bg: "rgba(120,120,120,0.12)", color: "var(--text-muted)" };
+    const rowBg  = i % 2 === 0 ? "" : "background:var(--bg)";
+    const noBiz  = !l.nomeNegocio;
+    return `<tr style="${rowBg};border-bottom:1px solid var(--border)">
+      ${td(l.nome, ";font-weight:500;color:var(--text)")}
+      ${tdM(l.email)}
+      ${td(l.empresa)}
+      <td style="padding:8px 10px;font-size:.79rem;color:${noBiz ? "var(--text-muted)" : "var(--text-secondary)"}">
+        ${noBiz ? '<span style="font-size:.74rem;color:var(--text-muted);font-style:italic">não encontrado</span>' : escapeHtml(l.nomeNegocio)}
+      </td>
+      <td style="padding:8px 10px">${gadsLeadStageBadge(l.stage)}</td>
+      <td style="padding:8px 10px;white-space:nowrap">
+        <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:600;background:${cb.bg};color:${cb.color}">${escapeHtml(l.canal)}</span>
+      </td>
+      ${td(l.origem)}
+      ${td(l.campanha, ";max-width:220px")}
+      ${td(l.keyword,  ";max-width:160px")}
+      ${td(l.anuncio,  ";max-width:200px")}
+      ${tdM(l.nomeFormulario)}
+      ${tdM(l.paginaConversao, ";max-width:160px")}
+      ${tdM(l.data)}
+      ${tdM(l.gclid  !== "—" ? l.gclid.slice(0, 12) + "…" : "—")}
+      ${tdM(l.gbraid !== "—" ? l.gbraid.slice(0, 12) + "…" : "—")}
+    </tr>`;
+  }).join("");
+}
+
+// ---------------------------------------------------------------------------
 // RENDERIZAÇÃO: GRÁFICOS (Chart.js)
 // ---------------------------------------------------------------------------
 const CHART_PALETTE = ["#6c5ce7", "#8b7bff", "#2ecc8f", "#f5b942", "#ff6b6b", "#4fb6e8", "#d98a4b", "#9aa4b8"];
@@ -950,6 +1145,7 @@ function renderAll() {
   renderRankings(creatives);
   renderInsights(creatives);
   renderTable();
+  renderLeadsByChannel();
   renderCharts(creatives);
 
   const hasData = state.creatives.length > 0;
@@ -1055,6 +1251,9 @@ document.getElementById("clearFiltersBtn").addEventListener("click", () => {
 );
 document.getElementById("filterCriativo").addEventListener("input", debounce(applyFilters, 250));
 document.getElementById("tableSearch").addEventListener("input", debounce(renderTable, 200));
+
+document.getElementById("leadsChannelSearch").addEventListener("input",  debounce(renderLeadsByChannel, 200));
+document.getElementById("leadsChannelFilter").addEventListener("change", renderLeadsByChannel);
 
 document.querySelectorAll("#mainTable thead th").forEach((th) => {
   th.addEventListener("click", () => {
@@ -1639,7 +1838,7 @@ async function fetchAllData() {
     const [
       metaInsRes, metaLiveRes, zohoDealsRes,
       gadsDealsRes, gadsAccRes, gadsCamRes, gadsKwRes, gadsStRes,
-      slackMqlRes, metaDailyRes, reunioesApiRes,
+      slackMqlRes, metaDailyRes, reunioesApiRes, formLeadsRes, sheetLeadsRes,
     ] = await Promise.allSettled([
       fetch(`/api/meta/insights?${params}`).then(r => r.json()),
       fetch(`/api/meta/live?${params}`).then(r => r.json()).catch(() => ({ ok: false })),
@@ -1652,6 +1851,8 @@ async function fetchAllData() {
       fetch("/api/slack/mql").then(r => r.json()).catch(() => ({ ok: false, data: [] })),
       fetch(`/api/meta/live/daily?${params}`).then(r => r.json()).catch(() => ({ ok: false, data: [] })),
       fetch("/api/zoho/reunioes").then(r => r.json()).catch(() => ({ ok: false, data: [] })),
+      fetch("/api/webhooks/form-leads").then(r => r.json()).catch(() => ({ ok: false, data: [] })),
+      fetch("/api/sheets/form-leads").then(r => r.json()).catch(() => ({ ok: false, data: [] })),
     ]);
 
     const settled = (r) => r.status === "fulfilled" ? r.value : { ok: false, error: r.reason?.message, data: [] };
@@ -1660,6 +1861,8 @@ async function fetchAllData() {
     const zoho       = settled(zohoDealsRes);
     const gadsDeals  = settled(gadsDealsRes);
     const reunioesApi = settled(reunioesApiRes);
+    const formLeadsApi  = settled(formLeadsRes);
+    const sheetLeadsApi = settled(sheetLeadsRes);
     const gadsAcc   = settled(gadsAccRes);
     const gadsCam   = settled(gadsCamRes);
     const gadsKw    = settled(gadsKwRes);
@@ -1731,6 +1934,16 @@ async function fetchAllData() {
     if (reunioesApi.ok && Array.isArray(reunioesApi.data) && reunioesApi.data.length > 0) {
       state.reunioesRows = zohoApiToRows(reunioesApi.data);
       state.isOfficialReunioesData = true;
+    }
+
+    // Leads do formulário via Pluga (webhook em tempo real)
+    if (formLeadsApi.ok && Array.isArray(formLeadsApi.data)) {
+      state.formLeads = formLeadsApi.data;
+    }
+
+    // Leads da planilha de atribuição (fonte principal de campanha/anúncio/keyword)
+    if (sheetLeadsApi.ok && Array.isArray(sheetLeadsApi.data)) {
+      state.sheetLeads = sheetLeadsApi.data;
     }
 
     // Cruzamento Meta × Zoho → criativos

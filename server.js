@@ -595,6 +595,87 @@ app.get("/api/keyword-planner/ia/test", async (req, res) => {
   }
 });
 
+// ── POST /api/webhooks/form-lead ──────────────────────────────────────────────
+// Recebe submissão do formulário Elementor via Pluga.
+// Payload Pluga: { fields: { campo: { value: "..." } }, form: { id, name }, __plg_received_at }
+// Autenticação: header x-api-key: <PIPEDASH_WEBHOOK_SECRET>
+//            ou header Authorization: Bearer <PIPEDASH_WEBHOOK_SECRET>
+app.post("/api/webhooks/form-lead", (req, res) => {
+  const expected = process.env.PIPEDASH_WEBHOOK_SECRET;
+  if (expected) {
+    const key = (req.headers["x-api-key"] ||
+      (req.headers["authorization"] || "").replace(/^Bearer\s+/i, "")).trim();
+    if (key !== expected) {
+      return res.status(401).json({ ok: false, error: "Webhook secret inválido" });
+    }
+  }
+
+  try {
+    const formLeadsService = require("./services/formLeadsService");
+    const lead = formLeadsService.addLead(req.body || {});
+    console.log(`[Webhook Form] ${lead.full_name || lead.email || "anônimo"} | channel: ${lead.channel} | campaign: ${lead.utm_campaign || "—"}`);
+    res.json({ ok: true, id: lead.id, channel: lead.channel });
+  } catch (err) {
+    console.error("[Webhook Form]", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── GET /api/webhooks/form-leads ──────────────────────────────────────────────
+// Retorna leads do formulário para o dashboard.
+// Filtros opcionais: ?since=YYYY-MM-DD &until=YYYY-MM-DD &canal=Google+Ads
+//                   &campanha=...      &email=...
+app.get("/api/webhooks/form-leads", (req, res) => {
+  try {
+    const formLeadsService = require("./services/formLeadsService");
+    const data = formLeadsService.getLeads(req.query);
+    res.json({ ok: true, count: data.length, data });
+  } catch (err) {
+    console.error("[Webhook Form Leads]", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── GET /api/sheets/form-leads ────────────────────────────────────────────────
+// Retorna leads da planilha de atribuição do Google Sheets.
+// Cache de 5 min no servidor. Use ?refresh=1 para forçar.
+// Filtros opcionais: ?canal= &campanha= &email= &since=YYYY-MM-DD &until=YYYY-MM-DD
+app.get("/api/sheets/form-leads", async (req, res) => {
+  try {
+    const sheetsService = require("./services/sheetsService");
+    const forceRefresh  = req.query.refresh === "1";
+    let leads = await sheetsService.getLeads({ forceRefresh });
+
+    const { canal, campanha, email, since, until } = req.query;
+    if (canal)    leads = leads.filter(l => (l.channel || "").toLowerCase() === canal.toLowerCase());
+    if (campanha) leads = leads.filter(l => (l.campanha || "").toLowerCase().includes(campanha.toLowerCase()));
+    if (email)    leads = leads.filter(l => (l.email    || "").toLowerCase().includes(email.toLowerCase()));
+    if (since) {
+      const d = new Date(since);
+      leads = leads.filter(l => {
+        if (!l.data) return false;
+        const [day, mon, yearTime] = l.data.split("/");
+        const yr = (yearTime || "").split(" ")[0];
+        return new Date(`${yr}-${mon}-${day}`) >= d;
+      });
+    }
+    if (until) {
+      const d = new Date(until); d.setHours(23, 59, 59);
+      leads = leads.filter(l => {
+        if (!l.data) return false;
+        const [day, mon, yearTime] = l.data.split("/");
+        const yr = (yearTime || "").split(" ")[0];
+        return new Date(`${yr}-${mon}-${day}`) <= d;
+      });
+    }
+
+    res.json({ ok: true, count: leads.length, data: leads });
+  } catch (err) {
+    console.error("[Sheets]", err.message);
+    res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
 // ── GET /api/status ───────────────────────────────────────────────────────────
 // Verifica quais integrações estão configuradas (sem expor os valores).
 app.get("/api/status", (_req, res) => {
