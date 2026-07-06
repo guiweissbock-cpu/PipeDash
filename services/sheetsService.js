@@ -51,29 +51,23 @@ function col(row, idx) {
   return (row[idx] || "").trim();
 }
 
-// Extrai parâmetros UTM de uma string que pode ser URL completa ou query string
-function parseUtmString(raw) {
-  const out = { utmCampaign: "", utmContent: "", utmKeyword: "", utmSource: "", utmMedium: "", gclid: "", gbraid: "" };
-  if (!raw || (!raw.includes("utm_") && !raw.includes("gclid") && !raw.includes("gbraid"))) return out;
+// Extrai todos os parâmetros de uma URL completa ou query string.
+// Usa new URL() quando possível — URLSearchParams decodifica %XX automaticamente (ex: %20 → espaço).
+function parseUrlParams(raw) {
+  const out = {};
+  if (!raw) return out;
   try {
-    let qs = raw.includes("?") ? raw.split("?")[1] : raw;
-    const p = new URLSearchParams(qs);
-    out.utmCampaign = p.get("utm_campaign") || p.get("campaign") || "";
-    out.utmContent  = p.get("utm_content")  || p.get("ad") || p.get("ad_name") || p.get("creative") || "";
-    out.utmKeyword  = p.get("utm_term") || p.get("utm_keyword") || p.get("keyword") || p.get("searchterm") || "";
-    out.utmSource   = p.get("utm_source") || "";
-    out.utmMedium   = p.get("utm_medium") || "";
-    out.gclid       = p.get("gclid") || "";
-    out.gbraid      = p.get("gbraid") || "";
+    const url = new URL(raw.includes("://") ? raw : `https://dummy.invalid/?${raw}`);
+    for (const [k, v] of url.searchParams) out[k] = v;
   } catch (_) {}
   return out;
 }
 
-function classifyChannel(row) {
-  const gclid          = col(row, C.GCLID);
-  const gbraid         = col(row, C.GBRAID);
+function classifyChannel(row, p = {}) {
+  const gclid          = col(row, C.GCLID)  || p.gclid  || "";
+  const gbraid         = col(row, C.GBRAID) || p.gbraid || "";
   const fbclid         = col(row, C.FBCLID);
-  const origem         = col(row, C.ORIGEM).toLowerCase();
+  const origem         = (col(row, C.ORIGEM) || p.utm_source || "").toLowerCase();
   const tag            = (col(row, C.TAG) + " " + col(row, C.TAG2)).toLowerCase();
   const nomeFormulario = col(row, C.NOME_FORMULARIO).toLowerCase();
   const metaAdsId      = col(row, C.META_ADS_ID);
@@ -101,18 +95,31 @@ function parseRow(row) {
   // Pula linha vazia ou cabeçalho
   if (!email || email.toLowerCase() === "e-mail" || email === "Email") return null;
 
-  const utmRaw = col(row, C.UTM_ID_LEAD);
-  const utm    = parseUtmString(utmRaw);
-  const channel = classifyChannel(row);
+  // Tenta extrair parâmetros da URL completa.
+  // Prioridade: coluna N → coluna M → coluna O (a que contiver URL completa vence).
+  const rawN = col(row, C.NOME_FORMULARIO);  // coluna N — contém URL para Google Ads
+  const rawM = col(row, C.PAGINA_CONVERSAO); // coluna M
+  const rawO = col(row, C.UTM_ID_LEAD);      // coluna O — pode ter URL ou Meta Lead ID
+  const urlSource = rawN.startsWith("http") ? rawN
+                  : rawM.startsWith("http") ? rawM
+                  : rawO.startsWith("http") ? rawO
+                  : (rawN || rawM || rawO);
+  const p = parseUrlParams(urlSource);
 
-  // Campanha: coluna Campanha → utm_campaign → Meta Ads Campanha
-  const campanha = col(row, C.CAMPANHA) || utm.utmCampaign || col(row, C.META_CAMPANHA);
+  const channel = classifyChannel(row, p);
 
-  // Anúncio: Meta Ads - Anuncio → utm_content → Tag
-  const anuncio = col(row, C.META_ANUNCIO) || utm.utmContent || col(row, C.TAG);
+  // Campanha: utm_campaign (URL) → coluna K → Meta Campanha
+  const campanha = p.utm_campaign || col(row, C.CAMPANHA) || col(row, C.META_CAMPANHA);
 
-  // Palavra-chave: KEYWORD → utm_term/keyword
-  const keyword = col(row, C.KEYWORD) || utm.utmKeyword;
+  // Anúncio: Meta Ads coluna → utm_content (URL) → Tag
+  const anuncio = col(row, C.META_ANUNCIO) || p.utm_content || p.ad_name || p.ad || col(row, C.TAG);
+
+  // Palavra-chave: utm_term → utm_keyword → keyword → searchterm → coluna Q
+  const keyword = p.utm_term || p.utm_keyword || p.keyword || p.searchterm || col(row, C.KEYWORD);
+
+  // GCLID / GBRAID: URL tem prioridade sobre colunas dedicadas
+  const gclid  = p.gclid  || col(row, C.GCLID);
+  const gbraid = p.gbraid || col(row, C.GBRAID);
 
   return {
     email,
@@ -125,17 +132,19 @@ function parseRow(row) {
     campanha,
     anuncio,
     keyword,
-    origem:          col(row, C.ORIGEM),
+    origem:          p.utm_source || col(row, C.ORIGEM),
     paginaConversao: col(row, C.PAGINA_CONVERSAO),
-    nomeFormulario:  col(row, C.NOME_FORMULARIO),
+    nomeFormulario:  rawN.startsWith("http") ? "" : rawN, // se col N for URL, não mostra como nome
     tag:             col(row, C.TAG),
-    gclid:           col(row, C.GCLID) || utm.gclid,
-    gbraid:          col(row, C.GBRAID) || utm.gbraid,
+    gclid,
+    gbraid,
     fbclid:          col(row, C.FBCLID),
     metaAdsId:       col(row, C.META_ADS_ID),
     metaLeadsId:     col(row, C.META_LEADS_ID),
     metaCampanha:    col(row, C.META_CAMPANHA),
     metaAnuncio:     col(row, C.META_ANUNCIO),
+    gadCampaignId:   p.gad_campaignid || "",
+    gadSource:       p.gad_source     || "",
     channel,
   };
 }
