@@ -921,25 +921,21 @@ function lcApplyFiltersAndSort(leads) {
   return result;
 }
 
-const LC_FUNNEL_SVG = `<svg width="11" height="9" viewBox="0 0 11 9" fill="currentColor" style="display:block"><rect x="0"   y="0"   width="11" height="1.8" rx=".9"/><rect x="2.2" y="3.6" width="6.6" height="1.8" rx=".9"/><rect x="4.4" y="7.2" width="2.2" height="1.8" rx=".9"/></svg>`;
-
 function updateLCHeaderIndicators() {
   LC_COLS.forEach(({ key }) => {
     const ind = document.getElementById(`lc-ind-${key}`);
     if (!ind) return;
-    const isSorted   = lcFilter.sortCol === key;
-    const isFiltered = !!lcFilter.colFilters[key]?.size;
-    let extraClass = "";
-    if (isSorted)   extraClass = "lc-th-ind--active";
-    else if (isFiltered) extraClass = "lc-th-ind--filtered";
-    ind.className = `lc-th-ind${extraClass ? " " + extraClass : ""}`;
-    ind.innerHTML = (isSorted ? `<span class="lc-th-sort">${lcFilter.sortDir === "asc" ? "↑" : "↓"}</span>` : "") + LC_FUNNEL_SVG;
+    let html = "";
+    if (lcFilter.sortCol === key)
+      html += `<span class="lc-th-sort">${lcFilter.sortDir === "asc" ? "↑" : "↓"}</span>`;
+    if (lcFilter.colFilters[key]?.size)
+      html += `<span class="lc-th-filter">▼</span>`;
+    ind.innerHTML = html;
   });
 }
 
 function renderLCValueList(search = "") {
-  const list    = document.getElementById("lc-values-list");
-  const showing = document.getElementById("lc-showing");
+  const list = document.getElementById("lc-values-list");
   if (!list || !lcDdState) return;
   const { allValues, tempSelected } = lcDdState;
   const q = search.trim().toLowerCase();
@@ -949,7 +945,6 @@ function renderLCValueList(search = "") {
       <input type="checkbox" value="${escapeHtml(v)}"${tempSelected.has(v) ? " checked" : ""}>
       <span title="${escapeHtml(v)}">${escapeHtml(v)}</span>
     </label>`).join("");
-  if (showing) showing.textContent = `Mostrando ${visible.length}`;
 }
 
 function openLCDropdown(colKey, thEl) {
@@ -966,37 +961,22 @@ function openLCDropdown(colKey, thEl) {
 
   lcDdState = { colKey, tempSelected, allValues };
 
-  // Atualiza estado dos botões de sort
   dd.querySelectorAll(".lc-sort-btn").forEach(btn => {
     btn.classList.toggle("active", lcFilter.sortCol === colKey && lcFilter.sortDir === btn.dataset.dir);
   });
-
-  // Atualiza "Selecionar tudo: N"
-  const selAllBtn = document.getElementById("lc-sel-all");
-  if (selAllBtn) selAllBtn.textContent = `Selecionar tudo: ${allValues.length}`;
-
   dd.querySelector(".lc-dd-search").value = "";
   renderLCValueList();
 
-  // Destaca o th ativo
-  document.querySelectorAll("#leadsChannelTable thead th").forEach(th => th.classList.remove("lc-th-open"));
-  thEl.classList.add("lc-th-open");
-
-  // Posiciona abaixo do th; inverte para cima se não cabe na viewport
+  // Posiciona abaixo do th
+  const rect = thEl.getBoundingClientRect();
+  dd.style.top  = `${rect.bottom + 4}px`;
+  dd.style.left = `${Math.min(rect.left, window.innerWidth - 304)}px`;
   dd.classList.add("open");
-  const rect  = thEl.getBoundingClientRect();
-  const ddH   = dd.offsetHeight;
-  const left  = Math.min(rect.left, window.innerWidth - 300);
-  const below = rect.bottom + 4;
-  const above = rect.top - ddH - 4;
-  dd.style.left = `${Math.max(0, left)}px`;
-  dd.style.top  = below + ddH < window.innerHeight ? `${below}px` : above >= 0 ? `${above}px` : `${below}px`;
 }
 
 function closeLCDropdown(apply) {
   const dd = document.getElementById("lc-dropdown");
   if (dd) dd.classList.remove("open");
-  document.querySelectorAll("#leadsChannelTable thead th").forEach(th => th.classList.remove("lc-th-open"));
   if (apply && lcDdState) {
     const { colKey, tempSelected, allValues } = lcDdState;
     if (!tempSelected.size || tempSelected.size >= allValues.length) {
@@ -1015,37 +995,29 @@ function initLeadsChannelFilter() {
   if (!thead || thead.dataset.lcInit) return;
   thead.dataset.lcInit = "1";
 
-  // Substitui conteúdo de cada th por botão com ícone de funil
+  // Substitui conteúdo de cada th por botão com indicador
   thead.querySelectorAll("th").forEach((th, i) => {
     const col = LC_COLS[i];
     if (!col) return;
     th.innerHTML = `<button class="lc-th-btn" data-col="${col.key}">
-      <span>${col.label}</span>
-      <span class="lc-th-ind" id="lc-ind-${col.key}">${LC_FUNNEL_SVG}</span>
+      <span>${col.label}</span><span class="lc-th-ind" id="lc-ind-${col.key}"></span>
     </button>`;
   });
 
-  // Cria dropdown singleton estilo Google Sheets
+  // Cria dropdown singleton
   const dd = document.createElement("div");
   dd.id = "lc-dropdown";
   dd.innerHTML = `
     <div class="lc-dd-sort">
-      <button class="lc-sort-btn" data-dir="asc"><span class="lc-sort-icon">↑</span>Classificar A a Z</button>
-      <button class="lc-sort-btn" data-dir="desc"><span class="lc-sort-icon">↓</span>Classificar Z a A</button>
+      <button class="lc-sort-btn" data-dir="asc">↑&nbsp; Ordem crescente</button>
+      <button class="lc-sort-btn" data-dir="desc">↓&nbsp; Ordem decrescente</button>
     </div>
     <div class="lc-dd-values">
       <div class="lc-dd-ctrl">
-        <span class="lc-ctrl-left">
-          <button class="lc-ctrl-btn" id="lc-sel-all">Selecionar tudo: 0</button>
-          <span class="lc-ctrl-sep">·</span>
-          <button class="lc-ctrl-btn" id="lc-sel-none">Limpar</button>
-        </span>
-        <span class="lc-ctrl-showing" id="lc-showing"></span>
+        <button class="lc-ctrl-btn" id="lc-sel-all">Selecionar tudo</button>
+        <button class="lc-ctrl-btn" id="lc-sel-none">Limpar</button>
       </div>
-      <div class="lc-search-wrap">
-        <input type="text" class="lc-dd-search" placeholder="Pesquisar" autocomplete="off">
-        <svg class="lc-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      </div>
+      <input type="text" class="lc-dd-search" placeholder="Buscar valor…" autocomplete="off">
       <div class="lc-values-list" id="lc-values-list"></div>
     </div>
     <div class="lc-dd-footer">
@@ -1508,7 +1480,7 @@ document.getElementById("filterCriativo").addEventListener("input", debounce(app
 document.getElementById("tableSearch").addEventListener("input", debounce(renderTable, 200));
 
 document.getElementById("leadsChannelSearch").addEventListener("input",  debounce(renderLeadsByChannel, 200));
-document.getElementById("leadsChannelFilter")?.addEventListener("change", renderLeadsByChannel);
+document.getElementById("leadsChannelFilter").addEventListener("change", renderLeadsByChannel);
 initLeadsChannelFilter();
 
 document.querySelectorAll("#mainTable thead th").forEach((th) => {
