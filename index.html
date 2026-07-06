@@ -284,8 +284,45 @@
   <!-- Tab: Tabela -->
   <div class="tab-panel" data-tab="table">
 
+    <!-- ── Leads por Canal ──────────────────────────────────────────────────── -->
+    <section class="card table-panel" id="leadsChannelPanel" hidden>
+      <div class="table-panel__header">
+        <div>
+          <h2 class="section-title" style="margin:0 0 2px">Leads por Canal</h2>
+          <p style="margin:0;font-size:.78rem;color:var(--text-muted)">Leads Meta Ads e Google Ads com estágio atual no funil</p>
+        </div>
+        <input type="search" id="leadsChannelSearch" placeholder="🔍 Buscar lead, campanha ou estágio…"
+          style="font-size:.82rem;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);width:240px">
+      </div>
+      <div class="table-scroll" style="margin-top:12px">
+        <table id="leadsChannelTable" style="width:100%;border-collapse:collapse;font-size:.82rem">
+          <thead>
+            <tr style="background:var(--bg);border-bottom:2px solid var(--border)">
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Nome</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">E-mail</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Empresa</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Negócio</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Estágio</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Canal</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Origem</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Campanha</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Palavra-chave</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Anúncio</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Formulário</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Página</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Data</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">GCLID</th>
+              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">GBRAID</th>
+            </tr>
+          </thead>
+          <tbody id="leadsChannelBody"></tbody>
+        </table>
+      </div>
+      <p id="leadsChannelCount" style="margin:10px 0 0;font-size:.76rem;color:var(--text-muted);text-align:right"></p>
+    </section>
+
     <!-- Table -->
-    <section class="card table-panel" id="tablePanel" hidden>
+    <section class="card table-panel" id="tablePanel" hidden style="margin-top:16px">
       <div class="table-panel__header">
         <h2 class="section-title">Tabela por Criativo/Anúncio</h2>
         <input type="search" id="tableSearch" placeholder="Buscar criativo ou campanha..." />
@@ -314,50 +351,6 @@
           <tbody id="mainTableBody"></tbody>
         </table>
       </div>
-    </section>
-
-    <!-- ── Leads por Canal ──────────────────────────────────────────────────── -->
-    <section class="card table-panel" id="leadsChannelPanel" hidden style="margin-top:16px">
-      <div class="table-panel__header" style="flex-wrap:wrap;gap:10px">
-        <div>
-          <h2 class="section-title" style="margin:0 0 2px">Leads por Canal</h2>
-          <p style="margin:0;font-size:.78rem;color:var(--text-muted)">Leads Meta Ads e Google Ads com estágio atual no funil</p>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <select id="leadsChannelFilter" style="font-size:.82rem;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)">
-            <option value="all">Todos os canais</option>
-            <option value="meta">Meta Ads</option>
-            <option value="google">Google Ads</option>
-          </select>
-          <input type="search" id="leadsChannelSearch" placeholder="🔍 Buscar lead, campanha ou estágio…"
-            style="font-size:.82rem;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);width:240px">
-        </div>
-      </div>
-      <div class="table-scroll" style="margin-top:12px">
-        <table id="leadsChannelTable" style="width:100%;border-collapse:collapse;font-size:.82rem">
-          <thead>
-            <tr style="background:var(--bg);border-bottom:2px solid var(--border)">
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Nome</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">E-mail</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Empresa</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Negócio</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Estágio</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Canal</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Origem</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Campanha</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Palavra-chave</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Anúncio</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Formulário</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Página</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Data</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">GCLID</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:600;color:var(--text-muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">GBRAID</th>
-            </tr>
-          </thead>
-          <tbody id="leadsChannelBody"></tbody>
-        </table>
-      </div>
-      <p id="leadsChannelCount" style="margin:10px 0 0;font-size:.76rem;color:var(--text-muted);text-align:right"></p>
     </section>
 
   </div>
