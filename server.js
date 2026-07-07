@@ -725,7 +725,8 @@ app.get("/api/version", (req, res) => {
 // Dry-run: lista leads Meta elegíveis (Zoho × Sheets) sem enviar nada.
 app.get("/api/transferencia/preview", async (req, res) => {
   try {
-    const result = await metaConversionsService.run({ dryRun: true });
+    const { since, until } = req.query;
+    const result = await metaConversionsService.run({ dryRun: true, since: since || null, until: until || null });
     res.json({ ok: true, data: result });
   } catch (err) {
     console.error("[Transferência Preview]", err.message);
@@ -738,7 +739,8 @@ app.get("/api/transferencia/preview", async (req, res) => {
 // Requer META_PIXEL_ID, META_ACCESS_TOKEN e META_APP_SECRET no .env.
 app.post("/api/transferencia/run", async (req, res) => {
   try {
-    const result = await metaConversionsService.run({ dryRun: false });
+    const { since, until } = req.body || {};
+    const result = await metaConversionsService.run({ dryRun: false, since: since || null, until: until || null });
     res.json({ ok: true, data: result });
   } catch (err) {
     console.error("[Transferência Run]", err.message);

@@ -21,14 +21,7 @@ const { normalizeKey } = require("../utils/normalize");
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
-const MEETING_STAGES = new Set([
-  "reuniao agendada", "reuniao realizada", "reuniao exploratoria realizada",
-  "reuniao alinhamento", "no show", "proposta enviada", "negociacao",
-  "assinatura realizada", "handoff", "em ativacao 30 dias", "em ativacao 60 dias",
-  "membros ativados no mes", "agendar reuniao de onboarding individual",
-  "reuniao de onboarding agendada", "no-show onboarding", "pdi",
-  "high touch", "mid touch", "low touch",
-]);
+const MEETING_STAGES = new Set(["reuniao agendada", "reuniao realizada"]);
 
 const META_ORIGIN_KW = [
   "pipelovers", "tofu", "bofu", "aula gratis", "aulas gratis",
@@ -307,7 +300,7 @@ function buildCrossRef(zohoDeals, sheetLeads) {
   }
 
   return zohoDeals
-    .filter((d) => isMetaOrigin(d.leadSource) && isMeetingStage(d.stage))
+    .filter((d) => isMeetingStage(d.stage) && !!(d.metaLeadId || d.metaAdId))
     .map((deal) => {
       let sheetLead = deal.metaLeadId ? (byMetaLeadId.get(String(deal.metaLeadId).trim()) || null) : null;
       if (!sheetLead && deal.contactName)
@@ -318,7 +311,7 @@ function buildCrossRef(zohoDeals, sheetLeads) {
 
 // ── Orquestrador ──────────────────────────────────────────────────────────────
 
-async function run({ dryRun = false, targetDedupeKey = null } = {}) {
+async function run({ dryRun = false, targetDedupeKey = null, since = null, until = null } = {}) {
   const pixelId = process.env.META_PIXEL_ID;
 
   if (!dryRun) {
@@ -335,6 +328,19 @@ async function run({ dryRun = false, targetDedupeKey = null } = {}) {
 
   let pairs = buildCrossRef(zohoDeals, sheetLeads);
 
+  // Filtro de período (por data de criação do deal no Zoho)
+  if (since || until) {
+    const sinceDate = since ? new Date(since) : null;
+    const untilDate = until ? new Date(until + "T23:59:59") : null;
+    pairs = pairs.filter(({ deal }) => {
+      if (!deal.createdTime) return true;
+      const d = new Date(deal.createdTime);
+      if (sinceDate && d < sinceDate) return false;
+      if (untilDate && d > untilDate) return false;
+      return true;
+    });
+  }
+
   // Modo retry: filtra apenas o deal alvo
   if (targetDedupeKey) {
     pairs = pairs.filter(({ deal }) => `zoho_${deal.id}_reuniao` === targetDedupeKey);
@@ -343,7 +349,7 @@ async function run({ dryRun = false, targetDedupeKey = null } = {}) {
 
   const summary = {
     totalElegiveis: pairs.length,
-    enviados: 0, duplicatas: 0, semPii: 0, erros: 0,
+    enviados: 0, duplicatas: 0, semPii: 0, erros: 0, pendentes: 0,
     items: [],
   };
 
@@ -370,16 +376,35 @@ async function run({ dryRun = false, targetDedupeKey = null } = {}) {
       sentAt:       now,
     };
 
-    // Já enviado com sucesso — skip (a não ser que seja retry explícito)
-    if (!targetDedupeKey && alreadySent(log, dedupeKey)) {
-      const item = { ...baseItem, status: "duplicata" };
-      summary.duplicatas++;
-      summary.items.push(item);
+    // Preview: mostra todos com status real do log
+    if (dryRun) {
+      const logEntry = log.find(e => e.dedupeKey === dedupeKey);
+      const status = !logEntry              ? "pendente"
+        : logEntry.status === "success"     ? "enviado_sucesso"
+        : logEntry.status;
+      summary.items.push({
+        ...baseItem,
+        status,
+        ...(logEntry ? {
+          attempts:        logEntry.attempts,
+          sentAt:          logEntry.sentAt || baseItem.sentAt,
+          errorMessage:    logEntry.errorMessage    || null,
+          errorCode:       logEntry.errorCode       || null,
+          errorField:      logEntry.errorField      || null,
+          errorSuggestion: logEntry.errorSuggestion || null,
+          canRetry:        logEntry.canRetry        || false,
+        } : { attempts: 0, canRetry: false }),
+      });
+      if (status === "enviado_sucesso") summary.duplicatas++;
+      else if (status === "erro")       summary.erros++;
+      else if (status === "sem_pii")    summary.semPii++;
+      else                              summary.pendentes++;
       continue;
     }
 
-    if (dryRun) {
-      summary.items.push({ ...baseItem, status: "preview" });
+    // Send: pula leads já enviados com sucesso
+    if (!targetDedupeKey && alreadySent(log, dedupeKey)) {
+      summary.duplicatas++;
       continue;
     }
 

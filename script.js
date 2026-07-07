@@ -3047,11 +3047,13 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
   }
 
   const STATUS_CFG = {
-    success:   { label: "Enviado ✓",  bg: "rgba(0,168,107,.1)",  color: "var(--green)" },
-    erro:      { label: "Erro ✗",     bg: "rgba(229,72,72,.1)",  color: "var(--danger)" },
-    sem_pii:   { label: "Sem PII",    bg: "rgba(245,165,36,.1)", color: "var(--gold)" },
-    duplicata: { label: "Duplicata",  bg: "rgba(139,148,166,.1)","color": "var(--text-muted)" },
-    preview:   { label: "Preview",    bg: "rgba(15,110,255,.08)", color: "var(--accent)" },
+    success:         { label: "Enviado ✓", bg: "rgba(0,168,107,.1)",    color: "var(--green)" },
+    enviado_sucesso: { label: "Enviado ✓", bg: "rgba(0,168,107,.1)",    color: "var(--green)" },
+    pendente:        { label: "Pendente",  bg: "rgba(245,165,36,.13)",   color: "#d97706" },
+    erro:            { label: "Erro ✗",    bg: "rgba(229,72,72,.1)",     color: "var(--danger)" },
+    sem_pii:         { label: "Sem PII",   bg: "rgba(139,148,166,.15)",  color: "var(--text-muted)" },
+    duplicata:       { label: "Duplicata", bg: "rgba(139,148,166,.1)",   color: "var(--text-muted)" },
+    preview:         { label: "Preview",   bg: "rgba(15,110,255,.08)",   color: "var(--accent)" },
   };
 
   function statusBadge(s) {
@@ -3060,8 +3062,21 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
   }
 
   function retryBtn(item) {
-    if (!item.canRetry || item.status === "success" || item.status === "preview") return "—";
+    const noRetry = ["success", "enviado_sucesso", "pendente", "duplicata", "preview"];
+    if (!item.canRetry || noRetry.includes(item.status)) return "—";
     return `<button class="btn btn--ghost btn--sm trf-retry-btn" data-key="${item.dedupeKey}" title="Tentar novamente">↺ Reenviar</button>`;
+  }
+
+  function periodToRange() {
+    const now   = new Date();
+    const today = now.toISOString().slice(0, 10);
+    if (_trfPeriod === "custom" && _trfCustomFrom && _trfCustomTo)
+      return { since: _trfCustomFrom, until: _trfCustomTo };
+    if (_trfPeriod === "mes") {
+      return { since: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10), until: today };
+    }
+    const n = parseInt(_trfPeriod) || 7;
+    return { since: new Date(+now - (n - 1) * 86400000).toISOString().slice(0, 10), until: today };
   }
 
   function setError(msg) {
@@ -3249,11 +3264,14 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
     setLoading(btn, true);
     setError("");
     try {
-      const res  = await fetch("/api/transferencia/preview");
+      const { since, until } = periodToRange();
+      const qs   = new URLSearchParams({ since, until }).toString();
+      const res  = await fetch(`/api/transferencia/preview?${qs}`);
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Erro no preview");
       _trfAllItems = json.data.items;
-      renderTable(_trfAllItems, `Preview — ${json.data.totalElegiveis} leads elegíveis`);
+      const d = json.data;
+      renderTable(_trfAllItems, `Preview — ${d.pendentes || 0} pendentes · ${d.duplicatas || 0} enviados · ${d.erros || 0} erros`);
     } catch (err) {
       setError("Preview: " + err.message);
     } finally {
@@ -3267,11 +3285,17 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
     setLoading(btn, true);
     setError("");
     try {
-      const res  = await fetch("/api/transferencia/run", { method: "POST" });
+      const { since, until } = periodToRange();
+      const res  = await fetch("/api/transferencia/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ since, until }),
+      });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Erro no envio");
       _trfAllItems = json.data.items;
-      renderTable(_trfAllItems, `Resultado — ${json.data.enviados} enviados, ${json.data.erros} erros`);
+      const d = json.data;
+      renderTable(_trfAllItems, `Resultado — ${d.enviados} enviados · ${d.erros} erros · ${d.duplicatas} já enviados`);
       await loadStats();
     } catch (err) {
       setError("Envio: " + err.message);
