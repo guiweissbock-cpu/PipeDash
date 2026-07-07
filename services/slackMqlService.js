@@ -93,7 +93,10 @@ async function getMqlLeads(channelId = "C05G0BZ904W", limit = 200) {
 
   // Fallback: arquivo de cache populado pelo Claude via MCP
   const cache = readCache();
-  if (!cache.ok) throw new Error("Sem SLACK_BOT_TOKEN e cache não encontrado");
+  if (!cache.ok) {
+    console.warn("[Slack MQL] Sem token configurado e sem cache local — retornando vazio");
+    return [];
+  }
   return cache.leads;
 }
 
