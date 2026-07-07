@@ -300,7 +300,7 @@ function buildCrossRef(zohoDeals, sheetLeads) {
   }
 
   return zohoDeals
-    .filter((d) => isMeetingStage(d.stage) && !!(d.metaLeadId || d.metaAdId))
+    .filter((d) => isMeetingStage(d.stage) && (isMetaOrigin(d.leadSource) || !!(d.metaLeadId || d.metaAdId)))
     .map((deal) => {
       let sheetLead = deal.metaLeadId ? (byMetaLeadId.get(String(deal.metaLeadId).trim()) || null) : null;
       if (!sheetLead && deal.contactName)
