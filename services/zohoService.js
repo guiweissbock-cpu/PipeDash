@@ -80,10 +80,13 @@ async function getAccessToken() {
 
 function extractContactName(value) {
   if (!value) return "";
-  // Módulo API retorna Contact_Name como objeto {id, name}
-  // Analytics API retorna como string direta
   if (typeof value === "object") return value.name || "";
   return String(value);
+}
+
+function extractContactId(value) {
+  if (value && typeof value === "object") return value.id || "";
+  return "";
 }
 
 async function fetchDealsPage(token, module_, page = 1) {
@@ -122,6 +125,7 @@ function normalizeRecord(record) {
     id:             record.id || "",
     dealName:       record[fm.dealName]              || "",
     contactName:    extractContactName(record[fm.contactName]),
+    contactId:      extractContactId(record[fm.contactName]),
     leadSource:     record[fm.leadSource]            || "",
     stage:          record[fm.stage]                 || "",
     createdTime:    record[fm.createdTime]           || "",
@@ -199,4 +203,35 @@ async function getReport(reportId) {
   return all;
 }
 
-module.exports = { getDeals, getReport };
+// Cache em memória de contatos (válido até o próximo cold start)
+const _contactCache = new Map();
+
+async function getContactById(contactId) {
+  if (!contactId) return null;
+  if (_contactCache.has(contactId)) return _contactCache.get(contactId);
+
+  const token   = await getAccessToken();
+  const apiHost = (process.env.ZOHO_API_DOMAIN || "https://www.zohoapis.com").replace("https://", "");
+  const fields  = encodeURIComponent("Email,Phone,Mobile,First_Name,Last_Name");
+  const path    = `/crm/v2/Contacts/${contactId}?fields=${fields}`;
+
+  const json = await httpsGet(apiHost, path, { Authorization: `Zoho-oauthtoken ${token}` });
+
+  if (!json.data || !json.data[0]) {
+    _contactCache.set(contactId, null);
+    return null;
+  }
+
+  const r = json.data[0];
+  const contact = {
+    id:        r.id              || contactId,
+    email:     r.Email           || "",
+    phone:     r.Phone           || r.Mobile || "",
+    firstName: r.First_Name      || "",
+    lastName:  r.Last_Name       || "",
+  };
+  _contactCache.set(contactId, contact);
+  return contact;
+}
+
+module.exports = { getDeals, getReport, getContactById };

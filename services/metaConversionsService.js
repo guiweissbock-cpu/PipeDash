@@ -15,19 +15,12 @@ const fs      = require("fs");
 const path    = require("path");
 
 const zohoService      = require("./zohoService");
-const sheetsService    = require("./sheetsService");
 const sheetsLogService = require("./sheetsLogService");
 const { normalizeKey } = require("../utils/normalize");
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 const MEETING_STAGES = new Set(["reuniao agendada", "reuniao realizada"]);
-
-const META_ORIGIN_KW = [
-  "pipelovers", "tofu", "bofu", "aula gratis", "aulas gratis",
-  "meta ads", "meta adds", "metaads", "facebook", "instagram",
-  "levantada de mao", "levantada de mão",
-];
 
 // ── Persistência ──────────────────────────────────────────────────────────────
 
@@ -86,20 +79,15 @@ function normalizePhone(v)  {
   const d = String(v || "").replace(/\D/g, "");
   return (d.length === 10 || d.length === 11) ? "55" + d : d;
 }
-function splitName(full) {
-  const p = String(full || "").trim().split(/\s+/);
-  return { fn: p[0] || "", ln: p.slice(1).join(" ") || "" };
-}
-
-function buildUserDataHashes(lead) {
-  const r     = {};
-  const email = normalizeEmail(lead.email);
-  const phone = normalizePhone(lead.telefone);
-  const { fn, ln } = splitName(lead.nome);
-  if (email) r.em = [sha256(email)];
-  if (phone) r.ph = [sha256(phone)];
-  if (fn)    r.fn = [sha256(normalizeKey(fn))];
-  if (ln)    r.ln = [sha256(normalizeKey(ln))];
+function buildUserDataHashes(contact) {
+  const r = {};
+  if (!contact) return r;
+  const email = normalizeEmail(contact.email);
+  const phone = normalizePhone(contact.phone);
+  if (email)             r.em = [sha256(email)];
+  if (phone)             r.ph = [sha256(phone)];
+  if (contact.firstName) r.fn = [sha256(normalizeKey(contact.firstName))];
+  if (contact.lastName)  r.ln = [sha256(normalizeKey(contact.lastName))];
   return r;
 }
 
@@ -197,25 +185,19 @@ function parseMetaError(errorMessage) {
 
 // ── Classificadores ───────────────────────────────────────────────────────────
 
-function isMetaOrigin(origem) {
-  const text = normalizeKey(String(origem || ""));
-  return META_ORIGIN_KW.some((kw) => text.includes(kw));
-}
-
 function isMeetingStage(stage) {
   return MEETING_STAGES.has(normalizeKey(String(stage || "")));
 }
 
 // ── Payload builder ───────────────────────────────────────────────────────────
 
-function buildPayload(sheetLead, deal) {
-  const hashes   = buildUserDataHashes(sheetLead);
+// contact = { email, phone, firstName, lastName } — vem do Zoho Contacts API
+function buildPayload(contact, deal) {
+  const hashes   = buildUserDataHashes(contact);
   const userData = { ...hashes };
 
-  const leadId = deal.metaLeadId || sheetLead.metaLeadsId || "";
-  if (leadId)            userData.lead_id    = leadId;
-  if (sheetLead.fbclid)  userData.fbc        = sheetLead.fbclid;
-  if (deal.id)           userData.external_id = [sha256(String(deal.id))];
+  if (deal.metaLeadId) userData.lead_id     = deal.metaLeadId;
+  if (deal.id)         userData.external_id  = [sha256(String(deal.id))];
 
   const eventTime = deal.createdTime
     ? Math.floor(new Date(deal.createdTime).getTime() / 1000)
@@ -235,9 +217,8 @@ function buildPayload(sheetLead, deal) {
       conversion_type: "reuniao_agendada",
       lead_status:     deal.stage,
       source:          "Meta Ads",
-      campanha:        deal.metaCampaign || sheetLead.campanha || "",
-      anuncio:         deal.metaAdName   || sheetLead.anuncio  || "",
-      form_id:         sheetLead.nomeFormulario || "",
+      campanha:        deal.metaCampaign || "",
+      anuncio:         deal.metaAdName   || "",
     },
   };
 }
@@ -286,30 +267,9 @@ function postToMeta(pixelId, payload) {
   });
 }
 
-// ── Cross-reference Zoho × Sheets ────────────────────────────────────────────
-
-function buildCrossRef(zohoDeals, sheetLeads) {
-  const byMetaLeadId = new Map();
-  const byName       = new Map();
-
-  for (const lead of sheetLeads) {
-    if (lead.channel !== "Meta Ads") continue;
-    if (lead.metaLeadsId) byMetaLeadId.set(String(lead.metaLeadsId).trim(), lead);
-    const k = normalizeKey(lead.nome);
-    if (k && !byName.has(k)) byName.set(k, lead);
-  }
-
-  return zohoDeals
-    .filter((d) => isMeetingStage(d.stage) && (isMetaOrigin(d.leadSource) || !!(d.metaLeadId || d.metaAdId)))
-    .map((deal) => {
-      let sheetLead = deal.metaLeadId ? (byMetaLeadId.get(String(deal.metaLeadId).trim()) || null) : null;
-      if (!sheetLead && deal.contactName)
-        sheetLead = byName.get(normalizeKey(String(deal.contactName))) || null;
-      return { deal, sheetLead };
-    });
-}
-
 // ── Orquestrador ──────────────────────────────────────────────────────────────
+// Fonte de dados: Zoho CRM (deals + contacts).
+// A planilha de log serve apenas para: verificar já-enviados, registrar resultados.
 
 async function run({ dryRun = false, targetDedupeKey = null, since = null, until = null } = {}) {
   const pixelId = process.env.META_PIXEL_ID;
@@ -320,15 +280,18 @@ async function run({ dryRun = false, targetDedupeKey = null, since = null, until
       throw new Error("META_ACCESS_TOKEN ou META_APP_SECRET não configurados no .env");
   }
 
-  const [zohoDeals, sheetLeads, log] = await Promise.all([
+  // Zoho e log em paralelo
+  const [zohoDeals, log] = await Promise.all([
     zohoService.getDeals(),
-    sheetsService.getLeads(),
     getLog(),
   ]);
 
-  let pairs = buildCrossRef(zohoDeals, sheetLeads);
+  // Elegíveis: stage + (metaAdName OU metaLeadId preenchido)
+  let pairs = zohoDeals
+    .filter(d => isMeetingStage(d.stage) && !!(d.metaAdName || d.metaLeadId))
+    .map(deal => ({ deal }));
 
-  // Filtro de período (por data de criação do deal no Zoho)
+  // Filtro de período (data de criação do deal no Zoho)
   if (since || until) {
     const sinceDate = since ? new Date(since) : null;
     const untilDate = until ? new Date(until + "T23:59:59") : null;
@@ -347,30 +310,43 @@ async function run({ dryRun = false, targetDedupeKey = null, since = null, until
     if (!pairs.length) throw new Error(`Deal não encontrado ou não é elegível: ${targetDedupeKey}`);
   }
 
+  // Pré-carrega contatos do Zoho para todos os deals elegíveis (paralelizado)
+  const contactIds = [...new Set(pairs.map(p => p.deal.contactId).filter(Boolean))];
+  const contactMap = {};
+  await Promise.all(
+    contactIds.map(id =>
+      zohoService.getContactById(id)
+        .then(c => { if (c) contactMap[id] = c; })
+        .catch(e => console.warn(`[Zoho Contact ${id}]`, e.message))
+    )
+  );
+
   const summary = {
     totalElegiveis: pairs.length,
     enviados: 0, duplicatas: 0, semPii: 0, erros: 0, pendentes: 0,
     items: [],
   };
 
-  for (const { deal, sheetLead } of pairs) {
+  for (const { deal } of pairs) {
     const dedupeKey = `zoho_${deal.id}_reuniao`;
     const now       = new Date().toISOString();
+    const contact   = deal.contactId ? (contactMap[deal.contactId] || null) : null;
 
     const baseItem = {
       dedupeKey,
       nomeNegocio:  deal.dealName     || "",
-      nomeContato:  deal.contactName  || "",
-      email:        sheetLead?.email    || "",
-      telefone:     sheetLead?.telefone || "",
-      leadId:       deal.metaLeadId    || sheetLead?.metaLeadsId || "",
-      metaAdsId:    deal.metaAdId      || sheetLead?.metaAdsId   || "",
-      formId:       sheetLead?.nomeFormulario || "",
-      campanha:     deal.metaCampaign  || sheetLead?.campanha    || "",
-      anuncio:      deal.metaAdName    || sheetLead?.anuncio     || "",
+      nomeContato:  contact
+        ? `${contact.firstName} ${contact.lastName}`.trim() || deal.contactName
+        : deal.contactName || "",
+      email:        contact?.email    || "",
+      telefone:     contact?.phone    || "",
+      leadId:       deal.metaLeadId   || "",
+      metaAdsId:    deal.metaAdId     || "",
+      formId:       "",
+      campanha:     deal.metaCampaign || "",
+      anuncio:      deal.metaAdName   || "",
       stage:        deal.stage,
-      dataZoho:     deal.createdTime   || "",
-      temSheetLead: !!sheetLead,
+      dataZoho:     deal.createdTime  || "",
       eventName:    "Schedule",
       eventId:      dedupeKey,
       sentAt:       now,
@@ -379,12 +355,11 @@ async function run({ dryRun = false, targetDedupeKey = null, since = null, until
     // Preview: mostra todos com status real do log
     if (dryRun) {
       const logEntry = log.find(e => e.dedupeKey === dedupeKey);
-      const status = !logEntry              ? "pendente"
-        : logEntry.status === "success"     ? "enviado_sucesso"
-        : logEntry.status;
+      const status = !logEntry
+        ? "pendente"
+        : logEntry.status === "success" ? "enviado_sucesso" : logEntry.status;
       summary.items.push({
-        ...baseItem,
-        status,
+        ...baseItem, status,
         ...(logEntry ? {
           attempts:        logEntry.attempts,
           sentAt:          logEntry.sentAt || baseItem.sentAt,
@@ -408,16 +383,15 @@ async function run({ dryRun = false, targetDedupeKey = null, since = null, until
       continue;
     }
 
-    // PII mínima
-    if (!sheetLead || (!sheetLead.email && !sheetLead.telefone)) {
-      const { suggestion } = parseMetaError("missing user_data");
+    // PII do contato Zoho — fonte oficial
+    if (!contact || (!contact.email && !contact.phone)) {
       const entry = {
         ...baseItem, status: "sem_pii",
-        errorMessage:  "Lead não encontrado na planilha ou sem email/telefone",
-        errorCode:     "missing_pii",
-        errorField:    "user_data",
-        errorSuggestion: "Cadastre o lead na planilha com email ou telefone",
-        canRetry:      false,
+        errorMessage:    "Lead elegível no Zoho CRM, mas sem e-mail ou telefone disponível para envio.",
+        errorCode:       "missing_pii",
+        errorField:      "user_data",
+        errorSuggestion: "Adicione e-mail ou telefone no contato do Zoho CRM",
+        canRetry:        true,
       };
       upsertEntry(log, dedupeKey, entry);
       if (sheetsLogService.isConfigured()) {
@@ -429,23 +403,21 @@ async function run({ dryRun = false, targetDedupeKey = null, since = null, until
       continue;
     }
 
-    const payload       = buildPayload(sheetLead, deal);
+    const payload       = buildPayload(contact, deal);
     const maskedPayload = buildMaskedPayload(payload);
 
     try {
-      const apiRes  = await postToMeta(pixelId, payload);
-      const entry   = {
+      const apiRes = await postToMeta(pixelId, payload);
+      const entry  = {
         ...baseItem,
-        status:        "success",
+        status:          "success",
         maskedPayload,
-        metaResponse:  apiRes.body,
-        metaEvents:    apiRes.body?.events_received ?? null,
-        metaTraceId:   apiRes.body?.fbtrace_id || null,
-        errorMessage:  null,
-        errorCode:     null,
-        errorField:    null,
-        errorSuggestion: null,
-        canRetry:      false,
+        metaResponse:    apiRes.body,
+        metaEvents:      apiRes.body?.events_received ?? null,
+        metaTraceId:     apiRes.body?.fbtrace_id || null,
+        errorMessage:    null, errorCode: null,
+        errorField:      null, errorSuggestion: null,
+        canRetry:        false,
       };
       upsertEntry(log, dedupeKey, entry);
       if (sheetsLogService.isConfigured()) {
@@ -458,12 +430,10 @@ async function run({ dryRun = false, targetDedupeKey = null, since = null, until
       const parsed = parseMetaError(err.message);
       const entry  = {
         ...baseItem,
-        status:         "erro",
+        status:       "erro",
         maskedPayload,
-        metaResponse:   null,
-        metaEvents:     null,
-        metaTraceId:    null,
-        errorMessage:   err.message,
+        metaResponse: null, metaEvents: null, metaTraceId: null,
+        errorMessage: err.message,
         ...parsed,
       };
       upsertEntry(log, dedupeKey, entry);
@@ -477,7 +447,6 @@ async function run({ dryRun = false, targetDedupeKey = null, since = null, until
   }
 
   if (!dryRun) saveLog(log);
-
   return summary;
 }
 
@@ -540,21 +509,19 @@ async function getLog() {
 }
 
 function examplePayload() {
-  const fakeLead = {
-    email: "joao.silva@exemplo.com", telefone: "11987654321",
-    nome: "João Silva", fbclid: "", metaLeadsId: "1234567890",
-    nomeFormulario: "", campanha: "PipeLovers - TOFU",
-    anuncio: "Video Aula Grátis 30s", channel: "Meta Ads",
+  const fakeContact = {
+    email: "joao.silva@exemplo.com", phone: "11987654321",
+    firstName: "João", lastName: "Silva",
   };
   const fakeDeal = {
     id: "zoho_deal_abc123", dealName: "João Silva - PipeLovers",
-    contactName: "João Silva", leadSource: "Meta Ads",
+    contactName: "João Silva", contactId: "contact_abc123",
     stage: "Reunião Agendada", createdTime: new Date().toISOString(),
     metaLeadId: "1234567890", metaAdId: "23854321098760143",
     metaAdName: "Video Aula Grátis 30s",
     metaCampaign: "PipeLovers - TOFU", metaCampaignId: "6509876543210",
   };
-  return buildMaskedPayload(buildPayload(fakeLead, fakeDeal));
+  return buildMaskedPayload(buildPayload(fakeContact, fakeDeal));
 }
 
 module.exports = { run, retry, getLog, getStats, examplePayload };
