@@ -747,10 +747,10 @@ app.post("/api/transferencia/run", async (req, res) => {
 });
 
 // ── GET /api/transferencia/log ────────────────────────────────────────────────
-// Retorna o histórico completo de envios (data/transferencia_log.json).
-app.get("/api/transferencia/log", (req, res) => {
+// Retorna o histórico completo de envios (Google Sheets ou arquivo local como fallback).
+app.get("/api/transferencia/log", async (req, res) => {
   try {
-    const log = metaConversionsService.getLog();
+    const log = await metaConversionsService.getLog();
     res.json({ ok: true, data: log });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -770,9 +770,9 @@ app.get("/api/transferencia/example", (req, res) => {
 
 // ── GET /api/transferencia/stats ─────────────────────────────────────────────
 // Estatísticas agregadas do log (cards de resumo + dados para gráfico).
-app.get("/api/transferencia/stats", (req, res) => {
+app.get("/api/transferencia/stats", async (req, res) => {
   try {
-    const stats = metaConversionsService.getStats();
+    const stats = await metaConversionsService.getStats();
     res.json({ ok: true, data: stats });
   } catch (err) {
     res.status(500).json({ error: err.message });

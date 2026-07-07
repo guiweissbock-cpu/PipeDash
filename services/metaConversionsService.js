@@ -16,6 +16,7 @@ const path    = require("path");
 
 const zohoService      = require("./zohoService");
 const sheetsService    = require("./sheetsService");
+const sheetsLogService = require("./sheetsLogService");
 const { normalizeKey } = require("../utils/normalize");
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -326,9 +327,10 @@ async function run({ dryRun = false, targetDedupeKey = null } = {}) {
       throw new Error("META_ACCESS_TOKEN ou META_APP_SECRET não configurados no .env");
   }
 
-  const [zohoDeals, sheetLeads] = await Promise.all([
+  const [zohoDeals, sheetLeads, log] = await Promise.all([
     zohoService.getDeals(),
     sheetsService.getLeads(),
+    getLog(),
   ]);
 
   let pairs = buildCrossRef(zohoDeals, sheetLeads);
@@ -338,8 +340,6 @@ async function run({ dryRun = false, targetDedupeKey = null } = {}) {
     pairs = pairs.filter(({ deal }) => `zoho_${deal.id}_reuniao` === targetDedupeKey);
     if (!pairs.length) throw new Error(`Deal não encontrado ou não é elegível: ${targetDedupeKey}`);
   }
-
-  const log = loadLog();
 
   const summary = {
     totalElegiveis: pairs.length,
@@ -395,6 +395,10 @@ async function run({ dryRun = false, targetDedupeKey = null } = {}) {
         canRetry:      false,
       };
       upsertEntry(log, dedupeKey, entry);
+      if (sheetsLogService.isConfigured()) {
+        const se = log.find(e => e.dedupeKey === dedupeKey) || entry;
+        sheetsLogService.upsertEntry(se).catch(e => console.warn("[SheetsLog]", e.message));
+      }
       summary.semPii++;
       summary.items.push(entry);
       continue;
@@ -419,6 +423,10 @@ async function run({ dryRun = false, targetDedupeKey = null } = {}) {
         canRetry:      false,
       };
       upsertEntry(log, dedupeKey, entry);
+      if (sheetsLogService.isConfigured()) {
+        const se = log.find(e => e.dedupeKey === dedupeKey) || entry;
+        sheetsLogService.upsertEntry(se).catch(e => console.warn("[SheetsLog]", e.message));
+      }
       summary.enviados++;
       summary.items.push(entry);
     } catch (err) {
@@ -434,6 +442,10 @@ async function run({ dryRun = false, targetDedupeKey = null } = {}) {
         ...parsed,
       };
       upsertEntry(log, dedupeKey, entry);
+      if (sheetsLogService.isConfigured()) {
+        const se = log.find(e => e.dedupeKey === dedupeKey) || entry;
+        sheetsLogService.upsertEntry(se).catch(e => console.warn("[SheetsLog]", e.message));
+      }
       summary.erros++;
       summary.items.push(entry);
     }
@@ -452,8 +464,8 @@ async function retry(dedupeKey) {
 
 // ── Stats a partir do log ─────────────────────────────────────────────────────
 
-function getStats() {
-  const log  = loadLog();
+async function getStats() {
+  const log  = await getLog();
   const now  = new Date();
   const todayStart  = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const weekStart   = new Date(+todayStart - 6 * 86400000);
@@ -494,7 +506,13 @@ function getStats() {
   return stats;
 }
 
-function getLog()      { return loadLog(); }
+async function getLog() {
+  if (sheetsLogService.isConfigured()) {
+    try { return await sheetsLogService.getLog(); }
+    catch (err) { console.error("[SheetsLog] Fallback para arquivo local:", err.message); }
+  }
+  return loadLog();
+}
 
 function examplePayload() {
   const fakeLead = {
