@@ -1064,7 +1064,7 @@ function renderLeadsByChannel() {
 // ---------------------------------------------------------------------------
 // RENDERIZAÇÃO: GRÁFICOS (Chart.js)
 // ---------------------------------------------------------------------------
-const CHART_PALETTE = ["#6c5ce7", "#8b7bff", "#2ecc8f", "#f5b942", "#ff6b6b", "#4fb6e8", "#d98a4b", "#9aa4b8"];
+const CHART_PALETTE = ["#0F6EFF", "#38A0FF", "#00A86B", "#F5A524", "#E54848", "#8B5CF6", "#D98A4B", "#8A94A6"];
 
 function destroyChart(name) {
   if (state.charts[name]) {
@@ -2134,10 +2134,10 @@ let _lmCurrentPeriod = { preset: "last_30d", since: "", until: "" };
 let _lmDailyChart   = null;
 
 const LM_DAILY_METRICS = [
-  { key: "leads",       label: "Leads",          color: "#6c5ce7", axis: "yL", group: "conv" },
-  { key: "reunioes",    label: "Reuniões",        color: "#2ecc8f", axis: "yL", group: "conv" },
-  { key: "assinaturas", label: "Assinaturas",     color: "#f5b942", axis: "yL", group: "conv" },
-  { key: "clicks",      label: "Cliques",         color: "#4fb6e8", axis: "yR", group: "media" },
+  { key: "leads",       label: "Leads",          color: "#0F6EFF", axis: "yL", group: "conv" },
+  { key: "reunioes",    label: "Reuniões",        color: "#00A86B", axis: "yL", group: "conv" },
+  { key: "assinaturas", label: "Assinaturas",     color: "#F5A524", axis: "yL", group: "conv" },
+  { key: "clicks",      label: "Cliques",         color: "#38A0FF", axis: "yR", group: "media" },
   { key: "impressions", label: "Impressões",      color: "#9aa4b8", axis: "yR", group: "media" },
   { key: "reach",       label: "Alcance",         color: "#d98a4b", axis: "yR", group: "media" },
   { key: "spend",       label: "Custo",           color: "#ff6b6b", axis: "yR", group: "cost" },
@@ -3634,8 +3634,8 @@ function renderKwResults(data) {
       <td style="padding:6px 10px;text-align:right">${k.hiCpc  > 0 ? "R$ " + k.hiCpc.toFixed(2)  : "—"}</td>
       <td style="padding:6px 10px;text-align:right">
         <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">
-          <div style="width:${barW}px;height:6px;background:#6c5ce7;border-radius:3px;min-width:2px"></div>
-          <span style="font-weight:600;color:#6c5ce7">${k.score.toLocaleString("pt-BR")}</span>
+          <div style="width:${barW}px;height:6px;background:#0F6EFF;border-radius:3px;min-width:2px"></div>
+          <span style="font-weight:600;color:#0F6EFF">${k.score.toLocaleString("pt-BR")}</span>
         </div>
       </td>
     </tr>`;
