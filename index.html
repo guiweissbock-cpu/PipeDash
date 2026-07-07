@@ -1186,6 +1186,164 @@
 
   <!-- ── TAB: TRANSFERÊNCIA ─────────────────────────────────────────────────── -->
   <div class="tab-panel" data-tab="transferencia">
+
+    <!-- Cabeçalho -->
+    <section class="card trf-header-card">
+      <div class="trf-header-row">
+        <div>
+          <h2 class="section-title" style="margin:0;font-size:1.05rem">🔄 Transferência — Meta Conversions API</h2>
+          <p style="margin:4px 0 0;font-size:.82rem;color:var(--text-muted)">Leads Meta Ads que viraram Reunião Agendada no Zoho CRM → enviados como eventos de conversão</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button id="trfRefreshStatsBtn" class="btn btn--ghost btn--sm">↻ Atualizar</button>
+          <button id="trfExampleBtn"      class="btn btn--ghost btn--sm">{ } Exemplo</button>
+          <button id="trfPreviewBtn"      class="btn btn--ghost">🔍 Preview</button>
+          <button id="trfRunBtn"          class="btn btn--primary">🚀 Enviar para Meta</button>
+        </div>
+      </div>
+      <p id="trfError" hidden style="margin:10px 0 0;font-size:13px;color:var(--danger);padding:8px 12px;background:rgba(229,72,72,.07);border-radius:6px;border:1px solid rgba(229,72,72,.2)"></p>
+    </section>
+
+    <!-- Cards de resumo -->
+    <div class="trf-cards-grid" id="trfCards">
+      <div class="metric-card" id="trfCardHoje">
+        <span class="metric-label">Hoje</span>
+        <span class="metric-value" id="trfValHoje">—</span>
+      </div>
+      <div class="metric-card" id="trfCardSemana">
+        <span class="metric-label">Esta Semana</span>
+        <span class="metric-value" id="trfValSemana">—</span>
+      </div>
+      <div class="metric-card" id="trfCardMes">
+        <span class="metric-label">Este Mês</span>
+        <span class="metric-value" id="trfValMes">—</span>
+      </div>
+      <div class="metric-card metric-card--highlight" id="trfCardSucesso">
+        <span class="metric-label">Sucesso</span>
+        <span class="metric-value" id="trfValSucesso" style="color:var(--green)">—</span>
+      </div>
+      <div class="metric-card" id="trfCardErro">
+        <span class="metric-label">Com Erro</span>
+        <span class="metric-value" id="trfValErro" style="color:var(--danger)">—</span>
+      </div>
+      <div class="metric-card metric-card--highlight-strong" id="trfCardTaxa">
+        <span class="metric-label">Taxa de Sucesso</span>
+        <span class="metric-value" id="trfValTaxa">—</span>
+      </div>
+    </div>
+
+    <!-- Gráfico de envios por dia -->
+    <section class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <h3 class="section-title" style="margin:0;font-size:.95rem">Envios por Dia</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap" id="trfPeriodBtns">
+          <button class="trf-period-btn active" data-period="7">7 dias</button>
+          <button class="trf-period-btn" data-period="30">30 dias</button>
+          <button class="trf-period-btn" data-period="mes">Mês atual</button>
+          <button class="trf-period-btn" data-period="custom">Personalizado</button>
+        </div>
+      </div>
+      <div id="trfCustomDates" hidden style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+        <div class="filter-field">
+          <label for="trfDateFrom">De</label>
+          <input type="date" id="trfDateFrom" />
+        </div>
+        <div class="filter-field">
+          <label for="trfDateTo">Até</label>
+          <input type="date" id="trfDateTo" />
+        </div>
+        <div class="filter-field--action">
+          <button id="trfApplyDates" class="btn btn--ghost btn--sm" style="margin-top:18px">Aplicar</button>
+        </div>
+      </div>
+      <div style="position:relative;height:220px">
+        <canvas id="trfChart"></canvas>
+        <p id="trfChartEmpty" hidden style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;margin:0">Nenhum envio registrado ainda.</p>
+      </div>
+    </section>
+
+    <!-- Filtros da tabela -->
+    <section class="card" style="padding:14px 20px">
+      <div class="trf-filters-grid">
+        <div class="filter-field">
+          <label>Status</label>
+          <select id="trfFStatus">
+            <option value="">Todos</option>
+            <option value="success">Sucesso</option>
+            <option value="erro">Erro</option>
+            <option value="sem_pii">Sem PII</option>
+            <option value="duplicata">Duplicata</option>
+            <option value="preview">Preview</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label>Nome do lead</label>
+          <input type="search" id="trfFNome" placeholder="Buscar nome…" />
+        </div>
+        <div class="filter-field">
+          <label>E-mail</label>
+          <input type="search" id="trfFEmail" placeholder="Buscar e-mail…" />
+        </div>
+        <div class="filter-field">
+          <label>Lead ID</label>
+          <input type="search" id="trfFLeadId" placeholder="Lead ID Meta" />
+        </div>
+        <div class="filter-field">
+          <label>Form ID</label>
+          <input type="search" id="trfFFormId" placeholder="Form ID" />
+        </div>
+        <div class="filter-field">
+          <label>Cód. erro</label>
+          <input type="search" id="trfFErro" placeholder="Ex: 190, timeout" />
+        </div>
+        <div class="filter-field--action" style="display:flex;align-items:flex-end">
+          <button id="trfFClear" class="btn btn--ghost btn--sm">Limpar filtros</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabela de logs -->
+    <section class="card" id="trfTableCard" hidden>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <h3 class="section-title" style="margin:0;font-size:.95rem" id="trfTableTitle">Histórico de Eventos</h3>
+        <span id="trfTableCount" style="font-size:12px;color:var(--text-muted)"></span>
+      </div>
+      <div class="table-scroll">
+        <table id="trfTable">
+          <thead>
+            <tr>
+              <th>Data/Hora</th>
+              <th>Nome / Negócio</th>
+              <th>E-mail</th>
+              <th>Telefone</th>
+              <th>Lead ID</th>
+              <th>Form ID</th>
+              <th>Meta Ads ID</th>
+              <th>Evento</th>
+              <th>Status</th>
+              <th>Resp. Meta</th>
+              <th>Tentativas</th>
+              <th>Erro</th>
+              <th>Campo</th>
+              <th>Sugestão</th>
+              <th>Pode Reenviar</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="trfTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Painel payload de exemplo -->
+    <section class="card" id="trfExampleCard" hidden>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <h3 class="section-title" style="margin:0;font-size:.9rem">Exemplo de Payload (dados fictícios · hashes mascarados)</h3>
+        <button id="trfExampleClose" class="btn btn--ghost btn--sm">Fechar</button>
+      </div>
+      <pre id="trfExampleJson" style="font-size:11.5px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;overflow-x:auto;line-height:1.55;margin:0;white-space:pre-wrap;word-break:break-all"></pre>
+    </section>
+
   </div><!-- /tab transferencia -->
 
 

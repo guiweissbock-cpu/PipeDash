@@ -3011,6 +3011,361 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
 });
 
 // =============================================================================
+// ABA: TRANSFERÊNCIA — Meta Conversions API
+// =============================================================================
+
+(function () {
+  "use strict";
+
+  // ── Estado ──────────────────────────────────────────────────────────────────
+  let _trfAllItems  = [];   // todos os itens carregados (log ou run)
+  let _trfChart     = null; // instância Chart.js
+  let _trfPorDia    = {};   // { "2026-07-07": { success:N, erro:N } }
+  let _trfPeriod    = "7";  // período selecionado no gráfico
+  let _trfCustomFrom = "";
+  let _trfCustomTo   = "";
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  const $ = (id) => document.getElementById(id);
+
+  function maskEmail(v) {
+    if (!v) return "—";
+    const [u, d] = v.split("@");
+    return (u || "").slice(0, 2) + "***@" + (d || "?");
+  }
+  function maskPhone(v) {
+    if (!v) return "—";
+    return v.slice(0, 3) + "****" + v.slice(-2);
+  }
+  function short(v, n = 22) {
+    const s = String(v || "");
+    return s.length > n ? s.slice(0, n) + "…" : (s || "—");
+  }
+  function fmtDt(iso) {
+    if (!iso) return "—";
+    return iso.slice(0, 16).replace("T", " ");
+  }
+
+  const STATUS_CFG = {
+    success:   { label: "Enviado ✓",  bg: "rgba(0,168,107,.1)",  color: "var(--green)" },
+    erro:      { label: "Erro ✗",     bg: "rgba(229,72,72,.1)",  color: "var(--danger)" },
+    sem_pii:   { label: "Sem PII",    bg: "rgba(245,165,36,.1)", color: "var(--gold)" },
+    duplicata: { label: "Duplicata",  bg: "rgba(139,148,166,.1)","color": "var(--text-muted)" },
+    preview:   { label: "Preview",    bg: "rgba(15,110,255,.08)", color: "var(--accent)" },
+  };
+
+  function statusBadge(s) {
+    const c = STATUS_CFG[s] || { label: s, bg: "transparent", color: "var(--text-muted)" };
+    return `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:${c.bg};color:${c.color}">${c.label}</span>`;
+  }
+
+  function retryBtn(item) {
+    if (!item.canRetry || item.status === "success" || item.status === "preview") return "—";
+    return `<button class="btn btn--ghost btn--sm trf-retry-btn" data-key="${item.dedupeKey}" title="Tentar novamente">↺ Reenviar</button>`;
+  }
+
+  function setError(msg) {
+    const el = $("trfError");
+    if (!el) return;
+    el.textContent = msg || "";
+    msg ? el.removeAttribute("hidden") : el.setAttribute("hidden", "");
+  }
+
+  function setLoading(btn, loading) {
+    if (!btn) return;
+    btn.disabled = loading;
+    if (loading) btn.dataset.origText = btn.textContent;
+    else btn.textContent = btn.dataset.origText || btn.textContent;
+  }
+
+  // ── Cards de resumo ───────────────────────────────────────────────────────────
+  function renderCards(s) {
+    const set = (id, val) => { const el = $(id); if (el) el.textContent = val ?? "—"; };
+    set("trfValHoje",   s.hoje    ?? 0);
+    set("trfValSemana", s.semana  ?? 0);
+    set("trfValMes",    s.mes     ?? 0);
+    set("trfValSucesso",s.sucessos ?? 0);
+    set("trfValErro",   s.erros   ?? 0);
+    set("trfValTaxa",   s.taxa != null ? s.taxa + "%" : "—");
+  }
+
+  // ── Gráfico ───────────────────────────────────────────────────────────────────
+  function buildChartDates(period, customFrom, customTo) {
+    const now    = new Date();
+    const today  = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let start;
+
+    if (period === "custom" && customFrom && customTo) {
+      start = new Date(customFrom);
+      const end = new Date(customTo);
+      const days = [];
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1))
+        days.push(d.toISOString().slice(0, 10));
+      return days;
+    }
+    if (period === "mes") {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else {
+      const n = parseInt(period) || 7;
+      start = new Date(+today - (n - 1) * 86400000);
+    }
+
+    const days = [];
+    for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1))
+      days.push(d.toISOString().slice(0, 10));
+    return days;
+  }
+
+  function renderChart(porDia) {
+    const canvas = $("trfChart");
+    const empty  = $("trfChartEmpty");
+    if (!canvas) return;
+
+    const dates   = buildChartDates(_trfPeriod, _trfCustomFrom, _trfCustomTo);
+    const success = dates.map((d) => (porDia[d] || {}).success || 0);
+    const errors  = dates.map((d) => (porDia[d] || {}).erro    || 0);
+    const hasData = success.some(Boolean) || errors.some(Boolean);
+
+    if (empty) hasData ? empty.setAttribute("hidden", "") : empty.removeAttribute("hidden");
+
+    if (_trfChart) { _trfChart.destroy(); _trfChart = null; }
+    if (!hasData) return;
+
+    const labels = dates.map((d) => {
+      const [, m, day] = d.split("-");
+      return `${day}/${m}`;
+    });
+
+    _trfChart = new Chart(canvas.getContext("2d"), {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          { label: "Sucesso", data: success, backgroundColor: "rgba(0,168,107,.7)",  borderRadius: 4, borderSkipped: false },
+          { label: "Erro",    data: errors,  backgroundColor: "rgba(229,72,72,.65)", borderRadius: 4, borderSkipped: false },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "top", labels: { font: { size: 12 } } } },
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
+          y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } } },
+        },
+      },
+    });
+  }
+
+  // ── Tabela de logs ────────────────────────────────────────────────────────────
+  function applyFilters(items) {
+    const status  = ($("trfFStatus")?.value  || "").toLowerCase();
+    const nome    = ($("trfFNome")?.value    || "").toLowerCase();
+    const email   = ($("trfFEmail")?.value   || "").toLowerCase();
+    const leadId  = ($("trfFLeadId")?.value  || "").toLowerCase();
+    const formId  = ($("trfFFormId")?.value  || "").toLowerCase();
+    const erro    = ($("trfFErro")?.value    || "").toLowerCase();
+
+    return items.filter((item) => {
+      if (status && item.status !== status)                                  return false;
+      if (nome   && !(item.nomeContato  || item.nomeNegocio || "").toLowerCase().includes(nome))  return false;
+      if (email  && !(item.email        || "").toLowerCase().includes(email))                     return false;
+      if (leadId && !(item.leadId       || "").toLowerCase().includes(leadId))                    return false;
+      if (formId && !(item.formId       || "").toLowerCase().includes(formId))                    return false;
+      if (erro   && !(item.errorCode    || item.errorMessage || "").toLowerCase().includes(erro)) return false;
+      return true;
+    });
+  }
+
+  function renderTable(items, title) {
+    const card  = $("trfTableCard");
+    const tbody = $("trfTableBody");
+    const ttl   = $("trfTableTitle");
+    const count = $("trfTableCount");
+    if (!card || !tbody) return;
+
+    const filtered = applyFilters(items);
+
+    if (ttl)   ttl.textContent   = title || "Histórico de Eventos";
+    if (count) count.textContent = `${filtered.length} de ${items.length} registros`;
+
+    tbody.innerHTML = filtered.map((item) => `
+      <tr>
+        <td style="font-size:11px;white-space:nowrap">${fmtDt(item.sentAt)}</td>
+        <td title="${item.nomeNegocio || ""}">${short(item.nomeContato || item.nomeNegocio, 20)}</td>
+        <td style="font-size:11px">${maskEmail(item.email)}</td>
+        <td style="font-size:11px">${maskPhone(item.telefone)}</td>
+        <td style="font-size:11px;font-family:monospace">${short(item.leadId, 18)}</td>
+        <td style="font-size:11px">${short(item.formId, 16)}</td>
+        <td style="font-size:11px;font-family:monospace">${short(item.metaAdsId, 16)}</td>
+        <td style="font-size:12px">Schedule</td>
+        <td>${statusBadge(item.status)}</td>
+        <td style="font-size:11px;font-family:monospace">${item.metaEvents != null ? `✓ ${item.metaEvents} evt` : "—"}</td>
+        <td style="text-align:center;font-size:12px">${item.attempts ?? 1}</td>
+        <td style="font-size:11px;color:var(--danger);max-width:160px;white-space:normal" title="${item.errorMessage || ""}">${short(item.errorMessage, 30)}</td>
+        <td style="font-size:11px;color:var(--text-muted)">${item.errorField || "—"}</td>
+        <td style="font-size:11px;max-width:180px;white-space:normal;color:var(--text-secondary)" title="${item.errorSuggestion || ""}">${short(item.errorSuggestion, 35)}</td>
+        <td style="text-align:center;font-size:11px">${item.canRetry ? "✓" : "—"}</td>
+        <td>${retryBtn(item)}</td>
+      </tr>`
+    ).join("") || `<tr><td colspan="16" style="text-align:center;color:var(--text-muted);padding:28px">Nenhum registro encontrado.</td></tr>`;
+
+    card.removeAttribute("hidden");
+  }
+
+  // ── Carregar stats do servidor ────────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      const res  = await fetch("/api/transferencia/stats");
+      const json = await res.json();
+      if (!json.ok) return;
+      renderCards(json.data);
+      _trfPorDia = json.data.porDia || {};
+      renderChart(_trfPorDia);
+    } catch (_) {}
+  }
+
+  // ── Carregar histórico do servidor ────────────────────────────────────────────
+  async function loadLog() {
+    try {
+      const res  = await fetch("/api/transferencia/log");
+      const json = await res.json();
+      if (!json.ok) return;
+      _trfAllItems = [...json.data].reverse();
+      renderTable(_trfAllItems, `Histórico — ${_trfAllItems.length} registros`);
+    } catch (_) {}
+  }
+
+  // ── Botões de ação principais ─────────────────────────────────────────────────
+  $("trfRefreshStatsBtn")?.addEventListener("click", async () => {
+    const btn = $("trfRefreshStatsBtn");
+    setLoading(btn, true);
+    await Promise.all([loadStats(), loadLog()]);
+    setLoading(btn, false);
+  });
+
+  $("trfPreviewBtn")?.addEventListener("click", async () => {
+    const btn = $("trfPreviewBtn");
+    setLoading(btn, true);
+    setError("");
+    try {
+      const res  = await fetch("/api/transferencia/preview");
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "Erro no preview");
+      _trfAllItems = json.data.items;
+      renderTable(_trfAllItems, `Preview — ${json.data.totalElegiveis} leads elegíveis`);
+    } catch (err) {
+      setError("Preview: " + err.message);
+    } finally {
+      setLoading(btn, false);
+    }
+  });
+
+  $("trfRunBtn")?.addEventListener("click", async () => {
+    if (!confirm("Confirmar envio de eventos de conversão para a Meta Ads?\n\nEsta ação envia dados reais para a API da Meta. Prosseguir?")) return;
+    const btn = $("trfRunBtn");
+    setLoading(btn, true);
+    setError("");
+    try {
+      const res  = await fetch("/api/transferencia/run", { method: "POST" });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "Erro no envio");
+      _trfAllItems = json.data.items;
+      renderTable(_trfAllItems, `Resultado — ${json.data.enviados} enviados, ${json.data.erros} erros`);
+      await loadStats();
+    } catch (err) {
+      setError("Envio: " + err.message);
+    } finally {
+      setLoading(btn, false);
+    }
+  });
+
+  // ── Exemplo de payload ────────────────────────────────────────────────────────
+  $("trfExampleBtn")?.addEventListener("click", async () => {
+    const card = $("trfExampleCard");
+    const pre  = $("trfExampleJson");
+    if (!card || !pre) return;
+    try {
+      const res  = await fetch("/api/transferencia/example");
+      const json = await res.json();
+      pre.textContent = JSON.stringify(json.data, null, 2);
+      card.removeAttribute("hidden");
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      setError("Erro ao carregar exemplo: " + err.message);
+    }
+  });
+
+  $("trfExampleClose")?.addEventListener("click", () => {
+    $("trfExampleCard")?.setAttribute("hidden", "");
+  });
+
+  // ── Período do gráfico ────────────────────────────────────────────────────────
+  document.querySelectorAll(".trf-period-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".trf-period-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      _trfPeriod = btn.dataset.period;
+      const customDates = $("trfCustomDates");
+      if (customDates) {
+        _trfPeriod === "custom"
+          ? customDates.removeAttribute("hidden")
+          : customDates.setAttribute("hidden", "");
+      }
+      if (_trfPeriod !== "custom") renderChart(_trfPorDia);
+    });
+  });
+
+  $("trfApplyDates")?.addEventListener("click", () => {
+    _trfCustomFrom = $("trfDateFrom")?.value || "";
+    _trfCustomTo   = $("trfDateTo")?.value   || "";
+    if (_trfCustomFrom && _trfCustomTo) renderChart(_trfPorDia);
+  });
+
+  // ── Filtros da tabela ─────────────────────────────────────────────────────────
+  ["trfFStatus","trfFNome","trfFEmail","trfFLeadId","trfFFormId","trfFErro"].forEach((id) => {
+    $(id)?.addEventListener("input", () => renderTable(_trfAllItems));
+  });
+
+  $("trfFClear")?.addEventListener("click", () => {
+    ["trfFStatus","trfFNome","trfFEmail","trfFLeadId","trfFFormId","trfFErro"].forEach((id) => {
+      const el = $(id);
+      if (el) el.value = "";
+    });
+    renderTable(_trfAllItems);
+  });
+
+  // ── Retry via delegação de eventos ───────────────────────────────────────────
+  $("trfTableBody")?.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".trf-retry-btn");
+    if (!btn) return;
+    const key = btn.dataset.key;
+    if (!key) return;
+    if (!confirm(`Reenviar evento para a Meta?\n\nKey: ${key}`)) return;
+    btn.disabled = true;
+    btn.textContent = "Enviando…";
+    setError("");
+    try {
+      const res  = await fetch(`/api/transferencia/retry/${encodeURIComponent(key)}`, { method: "POST" });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "Erro no reenvio");
+      await Promise.all([loadStats(), loadLog()]);
+    } catch (err) {
+      setError("Reenvio: " + err.message);
+      btn.disabled = false;
+      btn.textContent = "↺ Reenviar";
+    }
+  });
+
+  // ── Init: carrega ao ativar a aba ─────────────────────────────────────────────
+  document.querySelector('.tab-btn[data-tab="transferencia"]')?.addEventListener("click", () => {
+    loadStats();
+    loadLog();
+  });
+
+})();
+
+// =============================================================================
 // VISÃO GERAL — DASHBOARD EXECUTIVO
 // =============================================================================
 

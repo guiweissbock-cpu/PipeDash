@@ -12,10 +12,11 @@ require("dotenv").config();
 const express = require("express");
 const path    = require("path");
 
-const metaService       = require("./services/metaService");
-const zohoService       = require("./services/zohoService");
-const slackService      = require("./services/slackService");
-const googleAdsService  = require("./services/googleAdsService");
+const metaService             = require("./services/metaService");
+const zohoService             = require("./services/zohoService");
+const slackService            = require("./services/slackService");
+const googleAdsService        = require("./services/googleAdsService");
+const metaConversionsService  = require("./services/metaConversionsService");
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -718,6 +719,77 @@ app.get("/api/version", (req, res) => {
     commit,
     env: process.env.VERCEL_ENV || "development",
   });
+});
+
+// ── GET /api/transferencia/preview ───────────────────────────────────────────
+// Dry-run: lista leads Meta elegíveis (Zoho × Sheets) sem enviar nada.
+app.get("/api/transferencia/preview", async (req, res) => {
+  try {
+    const result = await metaConversionsService.run({ dryRun: true });
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    console.error("[Transferência Preview]", err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ── POST /api/transferencia/run ───────────────────────────────────────────────
+// Executa o envio real para a Meta Conversions API.
+// Requer META_PIXEL_ID, META_ACCESS_TOKEN e META_APP_SECRET no .env.
+app.post("/api/transferencia/run", async (req, res) => {
+  try {
+    const result = await metaConversionsService.run({ dryRun: false });
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    console.error("[Transferência Run]", err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ── GET /api/transferencia/log ────────────────────────────────────────────────
+// Retorna o histórico completo de envios (data/transferencia_log.json).
+app.get("/api/transferencia/log", (req, res) => {
+  try {
+    const log = metaConversionsService.getLog();
+    res.json({ ok: true, data: log });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/transferencia/example ───────────────────────────────────────────
+// Retorna exemplo de payload com dados fictícios (para auditoria/documentação).
+app.get("/api/transferencia/example", (req, res) => {
+  try {
+    const payload = metaConversionsService.examplePayload();
+    res.json({ ok: true, data: payload });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/transferencia/stats ─────────────────────────────────────────────
+// Estatísticas agregadas do log (cards de resumo + dados para gráfico).
+app.get("/api/transferencia/stats", (req, res) => {
+  try {
+    const stats = metaConversionsService.getStats();
+    res.json({ ok: true, data: stats });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/transferencia/retry/:dedupeKey ─────────────────────────────────
+// Reenvia um evento que falhou anteriormente.
+app.post("/api/transferencia/retry/:dedupeKey", async (req, res) => {
+  try {
+    const key    = decodeURIComponent(req.params.dedupeKey);
+    const result = await metaConversionsService.retry(key);
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    console.error("[Transferência Retry]", err.message);
+    res.status(502).json({ error: err.message });
+  }
 });
 
 app.listen(PORT, () => {

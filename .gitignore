@@ -15,6 +15,9 @@ _quota_state.json
 # Leads do formulário (cache local — não versionar)
 data/form_leads.json
 
+# Log de transferência Meta (histórico de envios — não versionar)
+data/transferencia_log.json
+
 # Backups locais (nunca versionar)
 backups/
 
