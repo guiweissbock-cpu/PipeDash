@@ -37,11 +37,15 @@ const META_ORIGIN_KW = [
 
 // ── Persistência ──────────────────────────────────────────────────────────────
 
-const DATA_DIR = path.join(__dirname, "..", "data");
+// Vercel: filesystem read-only exceto /tmp (efêmero entre cold starts)
+const DATA_DIR = process.env.VERCEL ? "/tmp" : path.join(__dirname, "..", "data");
 const LOG_FILE = path.join(DATA_DIR, "transferencia_log.json");
 
 function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (process.env.VERCEL) return; // /tmp já existe
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  } catch (_) {}
 }
 
 function loadLog() {
