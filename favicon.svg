@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Cilindro traseiro esquerdo (azul claro) -->
+  <ellipse cx="30" cy="28" rx="20" ry="7" fill="#3B7BFF"/>
+  <rect x="10" y="28" width="40" height="34" fill="#3B7BFF"/>
+  <ellipse cx="30" cy="62" rx="20" ry="7" fill="#2A6AEE"/>
+  <line x1="10" y1="38" x2="50" y2="38" stroke="white" stroke-width="3" opacity="0.6"/>
+  <line x1="10" y1="48" x2="50" y2="48" stroke="white" stroke-width="3" opacity="0.6"/>
+
+  <!-- Cilindro traseiro direito (azul claro) -->
+  <ellipse cx="70" cy="28" rx="20" ry="7" fill="#3B7BFF"/>
+  <rect x="50" y="28" width="40" height="34" fill="#3B7BFF"/>
+  <ellipse cx="70" cy="62" rx="20" ry="7" fill="#2A6AEE"/>
+  <line x1="50" y1="38" x2="90" y2="38" stroke="white" stroke-width="3" opacity="0.6"/>
+  <line x1="50" y1="48" x2="90" y2="48" stroke="white" stroke-width="3" opacity="0.6"/>
+
+  <!-- Cilindro frontal (azul navy) -->
+  <ellipse cx="50" cy="48" rx="22" ry="8" fill="#1A2F7A"/>
+  <rect x="28" y="48" width="44" height="38" fill="#152469"/>
+  <ellipse cx="50" cy="86" rx="22" ry="8" fill="#0F1E5C"/>
+  <line x1="28" y1="59" x2="72" y2="59" stroke="white" stroke-width="3" opacity="0.5"/>
+  <line x1="28" y1="70" x2="72" y2="70" stroke="white" stroke-width="3" opacity="0.5"/>
+  <line x1="28" y1="81" x2="72" y2="81" stroke="white" stroke-width="3" opacity="0.5"/>
+</svg>
