@@ -346,7 +346,7 @@ app.get("/api/google-ads/debug", async (req, res) => {
     const token = tokenJson.access_token;
 
     const customerId = process.env.GOOGLE_ADS_CUSTOMER_ID;
-    const mccId      = "6109276847";
+    const mccId      = process.env.GOOGLE_ADS_MCC_ID || process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || "6109276847";
     const devToken   = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
     const query      = '{"query":"SELECT campaign.id, campaign.name FROM campaign LIMIT 1"}';
     const results    = {};
