@@ -1736,7 +1736,7 @@ function metaApiToRows(apiRows) {
 
 // Converte resposta do /api/zoho/deals para o formato interno do pipeline
 function zohoApiToRows(apiRows) {
-  return apiRows.map((r) => {
+  const rows = apiRows.map((r) => {
     const stage = cleanDisplay(r.stage) || "";
     return {
       id:                  cleanDisplay(r.id) || "",
@@ -1755,6 +1755,9 @@ function zohoApiToRows(apiRows) {
       horaCriacao:         r.createdTime ? new Date(r.createdTime) : null,
     };
   }).filter((r) => r.stage || r.metaAdsAnuncio);
+  const discarded = apiRows.length - rows.length;
+  if (discarded > 0) console.log(`[zohoApiToRows] ${discarded} deal(s) descartados (sem stage e sem anúncio Meta)`);
+  return rows;
 }
 
 // Verifica status das integrações no servidor
