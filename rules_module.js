@@ -1052,17 +1052,17 @@
           border-bottom: 1px solid var(--rt-bdr);
           margin-bottom: 24px;
         }
-        .rules-header__title { flex: 1; min-width: 200px; }
-        .rules-header__title h1 {
+        #rulesTabContent .rules-header__title { flex: 1; min-width: 200px; }
+        #rulesTabContent .rules-header__title h1 {
           font-size: 1.35rem;
           font-weight: 700;
           letter-spacing: -.01em;
           margin: 0 0 4px;
-          color: var(--rt);
+          color: var(--rt) !important;
         }
-        .rules-header__title p {
+        #rulesTabContent .rules-header__title p {
           font-size: .78rem;
-          color: var(--rt-faint);
+          color: var(--rt-faint) !important;
           margin: 0;
         }
         .rules-search { flex: 1; min-width: 220px; max-width: 360px; }
@@ -1100,14 +1100,14 @@
           flex-direction: column;
           gap: 2px;
         }
-        .rules-nav__label {
+        #rulesTabContent .rules-nav__label {
           font-size: .68rem;
           text-transform: uppercase;
           letter-spacing: .08em;
-          color: var(--rt-faint);
+          color: var(--rt-faint) !important;
           margin: 0 0 6px 10px;
         }
-        .rules-nav__btn {
+        #rulesTabContent .rules-nav__btn {
           display: flex;
           justify-content: space-between;
           align-items: center;
@@ -1115,18 +1115,18 @@
           border-radius: 7px;
           border: none;
           background: transparent;
-          color: var(--rt-muted);
+          color: var(--rt-muted) !important;
           font-size: .8rem;
           cursor: pointer;
           text-align: left;
           transition: background .15s, color .15s;
         }
-        .rules-nav__btn:hover { background: var(--rt-nbg); color: var(--rt); }
-        .rules-nav__btn.active { background: var(--rt-nbg); color: var(--rt-accent); }
-        .rules-nav__count {
+        #rulesTabContent .rules-nav__btn:hover { background: var(--rt-nbg); color: var(--rt) !important; }
+        #rulesTabContent .rules-nav__btn.active { background: var(--rt-nbg); color: var(--rt-accent) !important; }
+        #rulesTabContent .rules-nav__count {
           font-size: .68rem;
           background: var(--rt-cnt);
-          color: var(--rt-muted);
+          color: var(--rt-muted) !important;
           border-radius: 10px;
           padding: 1px 6px;
         }
@@ -1134,120 +1134,121 @@
         /* ── Cards ──────────────────────────────────────────────────────────── */
         .rules-content { min-width: 0; }
         .rules-module-section { margin-bottom: 40px; }
-        .rules-module-heading {
+        /* ── Cards e texto — seletor duplo + !important para vencer CSS pai ── */
+        #rulesTabContent .rules-module-heading {
           font-size: 1rem;
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: .06em;
-          color: var(--rt-accent);
+          color: var(--rt-accent) !important;
           margin: 0 0 16px;
           padding-bottom: 8px;
           border-bottom: 1px solid var(--rt-bdr);
         }
-        .rules-cards { display: flex; flex-direction: column; gap: 14px; }
-        .rules-card {
-          background: var(--rt-card);
-          border: 1px solid var(--rt-bdr);
+        #rulesTabContent .rules-cards { display: flex; flex-direction: column; gap: 14px; }
+        #rulesTabContent .rules-card {
+          background: var(--rt-card) !important;
+          border: 1px solid var(--rt-bdr) !important;
           border-radius: 10px;
           overflow: hidden;
         }
-        .rules-card__header {
+        #rulesTabContent .rules-card__header {
           padding: 14px 18px 12px;
-          background: var(--rt-hdr);
-          border-bottom: 1px solid var(--rt-bdr2);
+          background: var(--rt-hdr) !important;
+          border-bottom: 1px solid var(--rt-bdr2) !important;
         }
-        .rules-card__meta {
+        #rulesTabContent .rules-card__meta {
           display: flex;
           gap: 8px;
           align-items: center;
           margin-bottom: 6px;
         }
-        .rules-card__id {
+        #rulesTabContent .rules-card__id {
           font-family: monospace;
           font-size: .72rem;
-          background: rgba(59,123,255,.18);
-          color: var(--rt-accent);
+          background: rgba(59,123,255,.18) !important;
+          color: var(--rt-accent) !important;
           padding: 2px 8px;
           border-radius: 4px;
           font-weight: 600;
         }
-        .rules-card__type {
+        #rulesTabContent .rules-card__type {
           font-size: .68rem;
           padding: 2px 8px;
           border-radius: 4px;
-          background: var(--rt-cnt);
-          color: var(--rt-muted);
+          background: var(--rt-cnt) !important;
+          color: var(--rt-muted) !important;
           text-transform: uppercase;
           letter-spacing: .04em;
         }
-        .rules-card__type--metrica-reunioes  { background: rgba(34,197,94,.15); color: #16a34a; }
-        .rules-card__type--metrica-conversao  { background: rgba(168,85,247,.15); color: #7c3aed; }
-        .rules-card__type--metrica-financeira { background: rgba(202,138,4,.15);  color: #b45309; }
-        .rules-card__type--metrica-leads      { background: rgba(59,130,246,.15); color: #1d4ed8; }
-        .rules-card__type--regra-calculo      { background: rgba(236,72,153,.12); color: #be185d; }
-        .rules-card__type--regra-negocio      { background: rgba(20,184,166,.12); color: #0f766e; }
-        .rules-card__type--regra-filtro       { background: rgba(99,102,241,.15); color: #4338ca; }
-        /* dark variants via token — restaura contraste em fundo escuro */
-        :root[data-theme="dark"] .rules-card__type--metrica-reunioes  { color: #4ade80; }
-        :root[data-theme="dark"] .rules-card__type--metrica-conversao  { color: #c084fc; }
-        :root[data-theme="dark"] .rules-card__type--metrica-financeira { color: #fbbf24; }
-        :root[data-theme="dark"] .rules-card__type--metrica-leads      { color: #60a5fa; }
-        :root[data-theme="dark"] .rules-card__type--regra-calculo      { color: #f472b6; }
-        :root[data-theme="dark"] .rules-card__type--regra-negocio      { color: #2dd4bf; }
-        :root[data-theme="dark"] .rules-card__type--regra-filtro       { color: #a5b4fc; }
+        #rulesTabContent .rules-card__type--metrica-reunioes  { background: rgba(34,197,94,.15) !important;  color: #16a34a !important; }
+        #rulesTabContent .rules-card__type--metrica-conversao  { background: rgba(168,85,247,.15) !important; color: #7c3aed !important; }
+        #rulesTabContent .rules-card__type--metrica-financeira { background: rgba(202,138,4,.15) !important;  color: #b45309 !important; }
+        #rulesTabContent .rules-card__type--metrica-leads      { background: rgba(59,130,246,.15) !important; color: #1d4ed8 !important; }
+        #rulesTabContent .rules-card__type--regra-calculo      { background: rgba(236,72,153,.12) !important; color: #be185d !important; }
+        #rulesTabContent .rules-card__type--regra-negocio      { background: rgba(20,184,166,.12) !important; color: #0f766e !important; }
+        #rulesTabContent .rules-card__type--regra-filtro       { background: rgba(99,102,241,.15) !important; color: #4338ca !important; }
+        /* dark: restaura cores claras */
+        :root[data-theme="dark"] #rulesTabContent .rules-card__type--metrica-reunioes  { color: #4ade80 !important; }
+        :root[data-theme="dark"] #rulesTabContent .rules-card__type--metrica-conversao  { color: #c084fc !important; }
+        :root[data-theme="dark"] #rulesTabContent .rules-card__type--metrica-financeira { color: #fbbf24 !important; }
+        :root[data-theme="dark"] #rulesTabContent .rules-card__type--metrica-leads      { color: #60a5fa !important; }
+        :root[data-theme="dark"] #rulesTabContent .rules-card__type--regra-calculo      { color: #f472b6 !important; }
+        :root[data-theme="dark"] #rulesTabContent .rules-card__type--regra-negocio      { color: #2dd4bf !important; }
+        :root[data-theme="dark"] #rulesTabContent .rules-card__type--regra-filtro       { color: #a5b4fc !important; }
         @media (prefers-color-scheme: dark) {
-          .rules-card__type--metrica-reunioes  { color: #4ade80; }
-          .rules-card__type--metrica-conversao  { color: #c084fc; }
-          .rules-card__type--metrica-financeira { color: #fbbf24; }
-          .rules-card__type--metrica-leads      { color: #60a5fa; }
-          .rules-card__type--regra-calculo      { color: #f472b6; }
-          .rules-card__type--regra-negocio      { color: #2dd4bf; }
-          .rules-card__type--regra-filtro       { color: #a5b4fc; }
+          #rulesTabContent .rules-card__type--metrica-reunioes  { color: #4ade80 !important; }
+          #rulesTabContent .rules-card__type--metrica-conversao  { color: #c084fc !important; }
+          #rulesTabContent .rules-card__type--metrica-financeira { color: #fbbf24 !important; }
+          #rulesTabContent .rules-card__type--metrica-leads      { color: #60a5fa !important; }
+          #rulesTabContent .rules-card__type--regra-calculo      { color: #f472b6 !important; }
+          #rulesTabContent .rules-card__type--regra-negocio      { color: #2dd4bf !important; }
+          #rulesTabContent .rules-card__type--regra-filtro       { color: #a5b4fc !important; }
         }
-        .rules-card__name {
+        #rulesTabContent .rules-card__name {
           font-size: .9rem;
-          font-weight: 600;
+          font-weight: 700;
           margin: 0;
           line-height: 1.4;
-          color: var(--rt);
+          color: var(--rt) !important;
         }
-        .rules-card__fields {
+        #rulesTabContent .rules-card__fields {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
           gap: 0;
           margin: 0;
           padding: 0;
         }
-        .rules-field {
+        #rulesTabContent .rules-field {
           padding: 10px 18px;
           border-bottom: 1px solid var(--rt-bdr2);
           border-right: 1px solid var(--rt-bdr2);
         }
-        .rules-field:last-child { border-bottom: none; }
-        .rules-field__label {
+        #rulesTabContent .rules-field:last-child { border-bottom: none; }
+        #rulesTabContent .rules-field__label {
           font-size: .67rem;
           text-transform: uppercase;
           letter-spacing: .06em;
-          color: var(--rt-faint);
+          color: var(--rt-faint) !important;
           margin-bottom: 3px;
-          font-weight: 600;
+          font-weight: 700;
         }
-        .rules-field__value {
-          font-size: .78rem;
-          line-height: 1.55;
+        #rulesTabContent .rules-field__value {
+          font-size: .82rem;
+          line-height: 1.6;
           margin: 0;
-          color: var(--rt);
+          color: var(--rt) !important;
           word-break: break-word;
         }
-        .rules-empty {
+        #rulesTabContent .rules-empty {
           padding: 48px;
           text-align: center;
-          color: var(--rt-muted);
+          color: var(--rt-muted) !important;
           font-size: .9rem;
         }
-        .rules-stats {
+        #rulesTabContent .rules-stats {
           font-size: .75rem;
-          color: var(--rt-faint);
+          color: var(--rt-faint) !important;
           margin-bottom: 16px;
         }
       </style>
