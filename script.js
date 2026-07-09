@@ -3035,6 +3035,7 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
     document.body.classList.toggle("tab-rankings-active", target === "rankings");
     document.body.classList.toggle("tab-insights-active", target === "insights");
     document.body.classList.toggle("tab-fin-active",      target === "fin");
+    document.body.classList.toggle("tab-rules-active",    target === "rules");
   });
 });
 
