@@ -679,7 +679,7 @@ function renderCards(creatives) {
   // Fallback para stage-check quando o relatório não foi carregado (fluxo CSV).
   let reunioes, assinaturas;
   if (state.reunioesFiltered.length > 0) {
-    ({ reunioes, assinaturas } = computeReunioesReport(state.reunioesFiltered, { skipOriginFilter: state.isOfficialReunioesData }));
+    ({ reunioes, assinaturas } = computeReunioesReport(state.reunioesFiltered));
   } else if (state.reunioesRows.length > 0) {
     // Relatório carregado mas filtro de período retornou vazio → 0 no período selecionado
     reunioes = 0;
@@ -1119,7 +1119,7 @@ function renderCharts(creatives) {
 function _auditDashboard(cardMetrics) {
   let ovMeet = 0, ovSign = 0;
   if (state.reunioesFiltered.length > 0) {
-    ({ reunioes: ovMeet, assinaturas: ovSign } = computeReunioesReport(state.reunioesFiltered, { skipOriginFilter: state.isOfficialReunioesData }));
+    ({ reunioes: ovMeet, assinaturas: ovSign } = computeReunioesReport(state.reunioesFiltered));
   } else if (state.reunioesRows.length === 0) {
     const zohoBase = state.zohoFiltered.length > 0 ? state.zohoFiltered : state.zohoRows;
     ({ reunioes: ovMeet, assinaturas: ovSign } = computeZohoMetaMetrics(zohoBase));
@@ -1344,7 +1344,7 @@ function buildSlackPayload() {
   const leadsZohoHoje   = dealsToday.length;
   const reunioesBaseHoje = (state.reunioesRows.length > 0 ? state.reunioesRows : state.zohoRows)
     .filter((d) => isSameDay(d.horaCriacao, today));
-  const { reunioes: reunioesHoje, assinaturas: assinaturasHoje } = computeReunioesReport(reunioesBaseHoje, { skipOriginFilter: state.isOfficialReunioesData });
+  const { reunioes: reunioesHoje, assinaturas: assinaturasHoje } = computeReunioesReport(reunioesBaseHoje);
   const metaRowsHoje = state.metaRows.filter(
     (r) => (r.dataInicio && isSameDay(r.dataInicio, today)) || (r.dataFim && isSameDay(r.dataFim, today)) || (!r.dataInicio && !r.dataFim)
   );
@@ -1354,7 +1354,7 @@ function buildSlackPayload() {
   // Acumulado: totais do período filtrado (reunioesFiltered respeita o seletor de datas).
   // Fallback para Zoho CSV apenas quando o relatório Zoho não foi carregado.
   const { reunioes: reunioesTotais, assinaturas: assinaturaTotais } = state.reunioesFiltered.length > 0
-    ? computeReunioesReport(state.reunioesFiltered, { skipOriginFilter: state.isOfficialReunioesData })
+    ? computeReunioesReport(state.reunioesFiltered)
     : (state.reunioesRows.length > 0
       ? { reunioes: 0, assinaturas: 0 }
       : computeZohoMetaMetrics(state.zohoRows));
