@@ -2459,7 +2459,7 @@ function renderLiveMeta(rows) {
 
   // Map ad_id → signDeals (para lookup independente da ordem de renderização)
   const signDealsByAdId = new Map();
-  sorted.forEach((r, i) => signDealsByAdId.set(r.ad_id || String(i), rowSignDeals[i]));
+  sorted.forEach((r, i) => signDealsByAdId.set(r.ad_id || `__idx_${i}`, rowSignDeals[i]));
 
   // ── Reuniões por criativo: mesmo matching das assinaturas, a partir de reunioesFiltered ──
   const seenMeetUid = new Set();
@@ -2485,12 +2485,12 @@ function renderLiveMeta(rows) {
   });
 
   const meetDealsByAdId = new Map();
-  sorted.forEach((r, i) => meetDealsByAdId.set(r.ad_id || String(i), rowMeetDeals[i]));
+  sorted.forEach((r, i) => meetDealsByAdId.set(r.ad_id || `__idx_${i}`, rowMeetDeals[i]));
 
   // ── Pré-computa dados de cada linha ──────────────────────────────────────────
-  const rowData = sorted.map(r => {
-    const meetDeals = meetDealsByAdId.get(r.ad_id || "") || [];
-    const signDeals = signDealsByAdId.get(r.ad_id || "") || [];
+  const rowData = sorted.map((r, i) => {
+    const meetDeals = meetDealsByAdId.get(r.ad_id || `__idx_${i}`) || [];
+    const signDeals = signDealsByAdId.get(r.ad_id || `__idx_${i}`) || [];
     const mqlLeads  = getMqlForAd(r).filter(l => l.isMql);
     return { r, meetDeals, signDeals, mqlLeads };
   });
