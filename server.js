@@ -72,29 +72,6 @@ app.get("/api/zoho/reunioes", async (req, res) => {
       zohoService.getDeals(),
     ]);
 
-    // Palavras-chave de origem que indicam lead do funil Meta Ads / Site PipeLovers
-    const ORIGIN_KW = [
-      "pipelovers", "tofu", "bofu",
-      "aula gratis", "aula grátis", "aulas gratis", "aulas grátis",
-      "levantada de mão", "levantada de mao",
-      "meta ads", "meta adds", "metaads",
-    ];
-
-    const normalize = (s) =>
-      String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-
-    const hasOrigin = (leadSource) => {
-      const src = normalize(leadSource);
-      return ORIGIN_KW.some((kw) => src.includes(kw));
-    };
-
-    // Primeiro dia do mês corrente (considera o mês do último registro do relatório se disponível)
-    const refDate     = reportData.length ? new Date(reportData[0].createdTime) : new Date();
-    const firstOfMonth = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
-    const lastOfMonth  = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0, 23, 59, 59);
-
-    const reportIds = new Set(reportData.map((r) => r.id));
-
     // Enriquece registros do relatório com campos Meta Ads que o Zoho Analytics não exporta.
     // Sem Meta_Ads_Anuncio/Meta_Ads_ADs_ID, a atribuição por criativo na tabela Live Meta falha.
     const dealsMap = new Map(allDeals.map((d) => [d.id, d]));
@@ -112,18 +89,8 @@ app.get("/api/zoho/reunioes", async (req, res) => {
       };
     });
 
-    const missing = allDeals.filter((d) => {
-      if (reportIds.has(d.id)) return false;
-      const created = new Date(d.createdTime);
-      if (created < firstOfMonth || created > lastOfMonth) return false;
-      return hasOrigin(d.leadSource);
-    });
-
-    if (missing.length) {
-      console.log(`[Zoho Reuniões] +${missing.length} deal(s) adicionados por origem (excluídos do relatório):`, missing.map((d) => d.dealName));
-    }
-
-    res.json({ ok: true, data: [...enrichedReport, ...missing] });
+    console.log(`[Zoho Reuniões] ${enrichedReport.length} registro(s) do relatório oficial.`);
+    res.json({ ok: true, data: enrichedReport });
   } catch (err) {
     console.error("[Zoho Reuniões]", err.message);
     res.status(502).json({ error: err.message });
