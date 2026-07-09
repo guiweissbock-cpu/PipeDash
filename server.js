@@ -15,11 +15,20 @@ require("dotenv").config();
 const express = require("express");
 const path    = require("path");
 
+const fs           = require("fs");
+const { execSync } = require("child_process");
+
 const metaService             = require("./services/metaService");
 const zohoService             = require("./services/zohoService");
 const slackService            = require("./services/slackService");
 const googleAdsService        = require("./services/googleAdsService");
 const metaConversionsService  = require("./services/metaConversionsService");
+const slackMqlService         = require("./services/slackMqlService");
+const kwPlannerService        = require("./services/kwPlannerService");
+const quotaManager            = require("./services/quotaManager");
+const formLeadsService        = require("./services/formLeadsService");
+const sheetsService           = require("./services/sheetsService");
+const pkg                     = require("./package.json");
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -438,7 +447,6 @@ app.post("/api/google-ads/keyword-ideas", async (req, res) => {
 // Tenta SLACK_BOT_TOKEN; se falhar, usa slack_mql_cache.json (populado pelo Claude via MCP).
 app.get("/api/slack/mql", async (req, res) => {
   try {
-    const slackMqlService = require("./services/slackMqlService");
     const channel = req.query.channel || "C05G0BZ904W";
     const limit   = Math.min(parseInt(req.query.limit || "200", 10), 200);
     const data    = await slackMqlService.getMqlLeads(channel, limit);
@@ -472,7 +480,6 @@ app.post("/api/keyword-planner/ia/run", async (req, res) => {
   };
 
   try {
-    const kwPlannerService = require("./services/kwPlannerService");
     await kwPlannerService.runIterativePlanner(req.body || {}, sendEvent);
   } catch (err) {
     console.error("[KwPlanner IA]", err.message);
@@ -537,7 +544,6 @@ app.post("/api/keyword-planner/ia/publish", async (req, res) => {
 // Aceita query: ?clearCache=1 para invalidar cache, ?resetQuota=1 (dev only)
 app.get("/api/keyword-planner/ia/quota", (req, res) => {
   try {
-    const quotaManager = require("./services/quotaManager");
     if (req.query.clearCache === "1") {
       quotaManager.cacheClear();
     }
@@ -599,7 +605,6 @@ app.post("/api/webhooks/form-lead", (req, res) => {
   }
 
   try {
-    const formLeadsService = require("./services/formLeadsService");
     const lead = formLeadsService.addLead(req.body || {});
     console.log(`[Webhook Form] ${lead.full_name || lead.email || "anônimo"} | channel: ${lead.channel} | campaign: ${lead.utm_campaign || "—"}`);
     res.json({ ok: true, id: lead.id, channel: lead.channel });
@@ -615,7 +620,6 @@ app.post("/api/webhooks/form-lead", (req, res) => {
 //                   &campanha=...      &email=...
 app.get("/api/webhooks/form-leads", (req, res) => {
   try {
-    const formLeadsService = require("./services/formLeadsService");
     const data = formLeadsService.getLeads(req.query);
     res.json({ ok: true, count: data.length, data });
   } catch (err) {
@@ -630,7 +634,6 @@ app.get("/api/webhooks/form-leads", (req, res) => {
 // Filtros opcionais: ?canal= &campanha= &email= &since=YYYY-MM-DD &until=YYYY-MM-DD
 app.get("/api/sheets/form-leads", async (req, res) => {
   try {
-    const sheetsService = require("./services/sheetsService");
     const forceRefresh  = req.query.refresh === "1";
     let leads = await sheetsService.getLeads({ forceRefresh });
 
@@ -667,8 +670,6 @@ app.get("/api/sheets/form-leads", async (req, res) => {
 // ── GET /api/status ───────────────────────────────────────────────────────────
 // Verifica quais integrações estão configuradas (sem expor os valores).
 app.get("/api/status", (_req, res) => {
-  const fs   = require("fs");
-  const path = require("path");
   const cacheFile = path.join(__dirname, "slack_mql_cache.json");
   const hasSlack  = !!process.env.SLACK_BOT_TOKEN || fs.existsSync(cacheFile);
   res.json({
@@ -685,9 +686,6 @@ app.get("/api/status", (_req, res) => {
 // Em produção usa VERCEL_GIT_COMMIT_SHA (injetado automaticamente pela Vercel).
 // Em desenvolvimento usa git rev-parse para obter o hash local.
 app.get("/api/version", (req, res) => {
-  const { execSync } = require("child_process");
-  const pkg = require("./package.json");
-
   let commit = process.env.VERCEL_GIT_COMMIT_SHA
     ? process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 7)
     : null;
