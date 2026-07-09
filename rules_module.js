@@ -972,11 +972,11 @@
       <style>
         /* ── Rules module: tokens próprios (independentes do tema pai) ─────── */
 
-        /* PADRÃO = CLARO (dark text on light bg — cobre a maioria dos casos) */
+        /* PADRÃO = CLARO (texto preto para máximo contraste) */
         #rulesTabContent {
-          --rt:       #1a202c;        /* texto principal — bem escuro    */
-          --rt-muted: #2d3748;        /* texto secundário                */
-          --rt-faint: #4a5568;        /* labels, texto terciário         */
+          --rt:       #000000;        /* texto principal                 */
+          --rt-muted: #000000;        /* texto secundário                */
+          --rt-faint: #000000;        /* labels, texto terciário         */
           --rt-accent:#1d4ed8;        /* azul destaque                   */
           --rt-card:  #ffffff;
           --rt-hdr:   #eff6ff;
@@ -1028,9 +1028,9 @@
 
         /* LIGHT via toggle do app (força claro mesmo com OS em dark) */
         :root[data-theme="light"] #rulesTabContent {
-          --rt:       #1a202c;
-          --rt-muted: #2d3748;
-          --rt-faint: #4a5568;
+          --rt:       #000000;
+          --rt-muted: #000000;
+          --rt-faint: #000000;
           --rt-accent:#1d4ed8;
           --rt-card:  #ffffff;
           --rt-hdr:   #eff6ff;
