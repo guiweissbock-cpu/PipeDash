@@ -1957,15 +1957,15 @@ async function fetchAllData() {
       populateFilterOptions(creatives);
     }
 
-    // Filtro de período para reuniões/assinaturas
+    // Filtro de período para reuniões/assinaturas.
+    // Aplicado mesmo quando isOfficialReunioesData=true: o relatório Zoho retorna todos os deals
+    // históricos com estágio de reunião, não apenas os do mês corrente.
     const dateRange      = presetToDateRange(preset, since, until);
     const filterByPeriod = (rows) => rows.filter(d => {
       if (!d.horaCriacao) return false;
       return d.horaCriacao >= dateRange.start && d.horaCriacao <= dateRange.end;
     });
-    const reunioesForPeriod = state.isOfficialReunioesData
-      ? state.reunioesRows
-      : filterByPeriod(state.reunioesRows);
+    const reunioesForPeriod = filterByPeriod(state.reunioesRows);
     state.reunioesFiltered  = reunioesForPeriod;
     const zohoForPeriod     = filterByPeriod(state.zohoRows);
 
@@ -2901,11 +2901,9 @@ async function fetchLiveMeta() {
       return d.horaCriacao >= dateRange.start && d.horaCriacao <= dateRange.end;
     });
 
-    // Quando usando relatório oficial, não filtrar por horaCriacao:
-    // o relatório Zoho já usa a data de agendamento da reunião, não de criação do deal.
-    const reunioesForPeriod = state.isOfficialReunioesData
-      ? state.reunioesRows
-      : filterByPeriod(state.reunioesRows);
+    // Filtra pelo período mesmo para dados oficiais: o relatório Zoho retorna todos os deals
+    // históricos com estágio de reunião, não apenas os do mês selecionado.
+    const reunioesForPeriod = filterByPeriod(state.reunioesRows);
     state.reunioesFiltered = reunioesForPeriod;
 
     const zohoForPeriod = filterByPeriod(state.zohoRows);
@@ -2989,10 +2987,8 @@ function applyLmFilter() {
   });
 
   // Re-filtra Zoho pelo período selecionado.
-  // Relatório oficial já vem filtrado pelo servidor — não refiltra por horaCriacao.
-  state.reunioesFiltered = state.isOfficialReunioesData
-    ? state.reunioesRows
-    : filterByPeriod(state.reunioesRows);
+  // Aplicado mesmo para dados oficiais: o relatório Zoho inclui dados históricos.
+  state.reunioesFiltered = filterByPeriod(state.reunioesRows);
   const zohoFiltered = filterByPeriod(state.zohoRows);
 
   // Recalcula cards
