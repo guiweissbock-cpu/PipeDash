@@ -972,74 +972,74 @@
       <style>
         /* ── Rules module: tokens próprios (independentes do tema pai) ─────── */
 
-        /* DARK — padrão */
+        /* PADRÃO = CLARO (dark text on light bg — cobre a maioria dos casos) */
         #rulesTabContent {
-          --rt:       #e2e8f0;        /* texto principal   */
-          --rt-muted: #94a3b8;        /* texto secundário  */
-          --rt-faint: #64748b;        /* texto terciário   */
-          --rt-accent:#7aadff;        /* azul destaque     */
-          --rt-card:  rgba(255,255,255,.05);
-          --rt-hdr:   rgba(59,123,255,.08);
-          --rt-bdr:   rgba(255,255,255,.09);
-          --rt-bdr2:  rgba(255,255,255,.05);
-          --rt-nbg:   rgba(59,123,255,.18);
-          --rt-cnt:   rgba(255,255,255,.09);
-          --rt-inp:   rgba(255,255,255,.07);
-          --rt-inp-b: rgba(255,255,255,.14);
+          --rt:       #1a202c;        /* texto principal — bem escuro    */
+          --rt-muted: #2d3748;        /* texto secundário                */
+          --rt-faint: #4a5568;        /* labels, texto terciário         */
+          --rt-accent:#1d4ed8;        /* azul destaque                   */
+          --rt-card:  #ffffff;
+          --rt-hdr:   #eff6ff;
+          --rt-bdr:   #e2e8f0;
+          --rt-bdr2:  #f1f5f9;
+          --rt-nbg:   rgba(59,123,255,.1);
+          --rt-cnt:   #eef2f7;
+          --rt-inp:   #ffffff;
+          --rt-inp-b: #cbd5e1;
 
           font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
           color: var(--rt);
           padding: 0 0 48px;
         }
 
-        /* LIGHT via media query */
-        @media (prefers-color-scheme: light) {
+        /* DARK via media query (OS em dark mode) */
+        @media (prefers-color-scheme: dark) {
           #rulesTabContent {
-            --rt:       #1e293b;
-            --rt-muted: #475569;
-            --rt-faint: #94a3b8;
-            --rt-accent:#1d4ed8;
-            --rt-card:  #ffffff;
-            --rt-hdr:   #eff6ff;
-            --rt-bdr:   #e2e8f0;
-            --rt-bdr2:  #f1f5f9;
-            --rt-nbg:   rgba(59,123,255,.1);
-            --rt-cnt:   #f1f5f9;
-            --rt-inp:   #ffffff;
-            --rt-inp-b: #cbd5e1;
+            --rt:       #e2e8f0;
+            --rt-muted: #94a3b8;
+            --rt-faint: #64748b;
+            --rt-accent:#7aadff;
+            --rt-card:  rgba(255,255,255,.05);
+            --rt-hdr:   rgba(59,123,255,.09);
+            --rt-bdr:   rgba(255,255,255,.09);
+            --rt-bdr2:  rgba(255,255,255,.05);
+            --rt-nbg:   rgba(59,123,255,.18);
+            --rt-cnt:   rgba(255,255,255,.09);
+            --rt-inp:   rgba(255,255,255,.07);
+            --rt-inp-b: rgba(255,255,255,.14);
           }
         }
 
-        /* LIGHT via toggle do app */
-        :root[data-theme="light"] #rulesTabContent {
-          --rt:       #1e293b;
-          --rt-muted: #475569;
-          --rt-faint: #94a3b8;
-          --rt-accent:#1d4ed8;
-          --rt-card:  #ffffff;
-          --rt-hdr:   #eff6ff;
-          --rt-bdr:   #e2e8f0;
-          --rt-bdr2:  #f1f5f9;
-          --rt-nbg:   rgba(59,123,255,.1);
-          --rt-cnt:   #f1f5f9;
-          --rt-inp:   #ffffff;
-          --rt-inp-b: #cbd5e1;
-        }
-
-        /* DARK via toggle do app (garante escuro mesmo com OS em light) */
+        /* DARK via toggle do app */
         :root[data-theme="dark"] #rulesTabContent {
           --rt:       #e2e8f0;
           --rt-muted: #94a3b8;
           --rt-faint: #64748b;
           --rt-accent:#7aadff;
           --rt-card:  rgba(255,255,255,.05);
-          --rt-hdr:   rgba(59,123,255,.08);
+          --rt-hdr:   rgba(59,123,255,.09);
           --rt-bdr:   rgba(255,255,255,.09);
           --rt-bdr2:  rgba(255,255,255,.05);
           --rt-nbg:   rgba(59,123,255,.18);
           --rt-cnt:   rgba(255,255,255,.09);
           --rt-inp:   rgba(255,255,255,.07);
           --rt-inp-b: rgba(255,255,255,.14);
+        }
+
+        /* LIGHT via toggle do app (força claro mesmo com OS em dark) */
+        :root[data-theme="light"] #rulesTabContent {
+          --rt:       #1a202c;
+          --rt-muted: #2d3748;
+          --rt-faint: #4a5568;
+          --rt-accent:#1d4ed8;
+          --rt-card:  #ffffff;
+          --rt-hdr:   #eff6ff;
+          --rt-bdr:   #e2e8f0;
+          --rt-bdr2:  #f1f5f9;
+          --rt-nbg:   rgba(59,123,255,.1);
+          --rt-cnt:   #eef2f7;
+          --rt-inp:   #ffffff;
+          --rt-inp-b: #cbd5e1;
         }
 
         /* ── Layout ────────────────────────────────────────────────────────── */
