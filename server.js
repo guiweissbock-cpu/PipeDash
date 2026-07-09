@@ -56,9 +56,9 @@ app.get("/api/zoho/deals", async (req, res) => {
 });
 
 // ── GET /api/zoho/reunioes ────────────────────────────────────────────────────
-// Busca o relatório "Reuniões geradas no mês" do Zoho Analytics e suplementa
-// com deals do mesmo mês que tenham origem em Meta Ads / Site PipeLovers mas
-// foram excluídos do relatório por filtro incorreto (ex: [AT CG] no nome).
+// Busca o relatório oficial "Reuniões geradas no mês" do Zoho Analytics (report_id),
+// enriquece cada registro com campos Meta Ads (Meta_Ads_Anuncio, Meta_Ads_ADs_ID)
+// a partir de getDeals() — necessário porque o Zoho Analytics não exporta esses campos.
 // ID configurável via ZOHO_REUNIOES_REPORT_ID no .env.
 app.get("/api/zoho/reunioes", async (req, res) => {
   try {
