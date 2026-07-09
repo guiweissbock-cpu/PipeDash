@@ -95,6 +95,23 @@ app.get("/api/zoho/reunioes", async (req, res) => {
 
     const reportIds = new Set(reportData.map((r) => r.id));
 
+    // Enriquece registros do relatório com campos Meta Ads que o Zoho Analytics não exporta.
+    // Sem Meta_Ads_Anuncio/Meta_Ads_ADs_ID, a atribuição por criativo na tabela Live Meta falha.
+    const dealsMap = new Map(allDeals.map((d) => [d.id, d]));
+    const enrichedReport = reportData.map((r) => {
+      const deal = dealsMap.get(r.id);
+      if (!deal) return r;
+      return {
+        ...r,
+        metaAdId:       r.metaAdId       || deal.metaAdId       || "",
+        metaAdName:     r.metaAdName     || deal.metaAdName     || "",
+        metaCampaign:   r.metaCampaign   || deal.metaCampaign   || "",
+        metaLeadId:     r.metaLeadId     || deal.metaLeadId     || "",
+        metaCampaignId: r.metaCampaignId || deal.metaCampaignId || "",
+        contactName:    r.contactName    || deal.contactName     || "",
+      };
+    });
+
     const missing = allDeals.filter((d) => {
       if (reportIds.has(d.id)) return false;
       const created = new Date(d.createdTime);
@@ -106,7 +123,7 @@ app.get("/api/zoho/reunioes", async (req, res) => {
       console.log(`[Zoho Reuniões] +${missing.length} deal(s) adicionados por origem (excluídos do relatório):`, missing.map((d) => d.dealName));
     }
 
-    res.json({ ok: true, data: [...reportData, ...missing] });
+    res.json({ ok: true, data: [...enrichedReport, ...missing] });
   } catch (err) {
     console.error("[Zoho Reuniões]", err.message);
     res.status(502).json({ error: err.message });

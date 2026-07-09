@@ -1961,7 +1961,9 @@ async function fetchAllData() {
       if (!d.horaCriacao) return false;
       return d.horaCriacao >= dateRange.start && d.horaCriacao <= dateRange.end;
     });
-    const reunioesForPeriod = filterByPeriod(state.reunioesRows);
+    const reunioesForPeriod = state.isOfficialReunioesData
+      ? state.reunioesRows
+      : filterByPeriod(state.reunioesRows);
     state.reunioesFiltered  = reunioesForPeriod;
     const zohoForPeriod     = filterByPeriod(state.zohoRows);
 
@@ -1990,7 +1992,7 @@ async function fetchAllData() {
     // Live Meta — métricas Zoho para a aba Live Meta
     let liveMetrics = null;
     if (metaLive.ok && Array.isArray(metaLive.data)) {
-      const { reunioes, assinaturas } = computeReunioesReport(reunioesForPeriod, { skipOriginFilter: state.isOfficialReunioesData });
+      const { reunioes, assinaturas } = computeReunioesReport(reunioesForPeriod);
       const { metaTotal }             = computeZohoMetaMetrics(zohoForPeriod);
       liveMetrics = { metaTotal, reunioes, assinaturas, ads: metaLive.data };
     }
@@ -2844,22 +2846,45 @@ async function fetchLiveMeta() {
 
     status.textContent = "Buscando Meta Ads e Zoho CRM...";
 
-    // Uma única chamada Zoho (deals) para todas as métricas.
-    // computeReunioesReport() filtra por stage internamente.
-    const [metaRes, zohoRes, dailyRes, mqlRes] = await Promise.all([
+    const [metaRes, zohoRes, dailyRes, mqlRes, reunioesRes] = await Promise.all([
       fetch(`/api/meta/live?${params}`).then((r) => r.json()),
       fetch("/api/zoho/deals").then((r) => r.json()).catch(() => ({ ok: false })),
       fetch(`/api/meta/live/daily?${params}`).then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/slack/mql").then((r) => r.json()).catch(() => ({ ok: false, data: [] })),
+      fetch("/api/zoho/reunioes").then((r) => r.json()).catch(() => ({ ok: false, data: [] })),
     ]);
 
     if (!metaRes.ok) throw new Error(metaRes.error || "Erro desconhecido");
 
     if (zohoRes.ok && Array.isArray(zohoRes.data)) {
-      const rows         = zohoApiToRows(zohoRes.data);
+      const rows = zohoApiToRows(zohoRes.data);
       state.zohoRows     = rows;
       state.zohoFiltered = rows;
+      // Fallback: usa todos os deals como base para reuniões (sobrescrito abaixo se relatório ok)
       state.reunioesRows = rows;
+      state.isOfficialReunioesData = false;
+    }
+
+    // Relatório oficial de reuniões do Zoho — já filtrado por mês no servidor.
+    // Tem precedência sobre todos os deals: não filtrar por horaCriacao aqui.
+    if (reunioesRes.ok && Array.isArray(reunioesRes.data) && reunioesRes.data.length > 0) {
+      const rawReport = zohoApiToRows(reunioesRes.data);
+      // O servidor já enriqueceu com campos Meta Ads; safety net caso o campo ainda esteja vazio.
+      const dealById = new Map((state.zohoRows || []).map((d) => [d.id, d]));
+      state.reunioesRows = rawReport.map((r) => {
+        const d = dealById.get(r.id);
+        if (!d) return r;
+        return {
+          ...r,
+          metaAdsId:         r.metaAdsId         || d.metaAdsId         || "",
+          metaAdsAnuncio:    r.metaAdsAnuncio     || d.metaAdsAnuncio    || "",
+          metaAdsAnuncioKey: r.metaAdsAnuncioKey  || d.metaAdsAnuncioKey || "",
+          metaAdsCampanha:   r.metaAdsCampanha    || d.metaAdsCampanha   || "",
+          metaAdsLeadId:     r.metaAdsLeadId      || d.metaAdsLeadId     || "",
+        };
+      });
+      state.isOfficialReunioesData = true;
+      console.log(`[Live Meta] Relatório oficial de reuniões: ${state.reunioesRows.length} registro(s)`);
     }
 
     // Filtra pelo período selecionado
@@ -2874,13 +2899,15 @@ async function fetchLiveMeta() {
       return d.horaCriacao >= dateRange.start && d.horaCriacao <= dateRange.end;
     });
 
-    const reunioesForPeriod = filterByPeriod(state.reunioesRows);
-    state.reunioesFiltered  = reunioesForPeriod;
+    // Quando usando relatório oficial, não filtrar por horaCriacao:
+    // o relatório Zoho já usa a data de agendamento da reunião, não de criação do deal.
+    const reunioesForPeriod = state.isOfficialReunioesData
+      ? state.reunioesRows
+      : filterByPeriod(state.reunioesRows);
+    state.reunioesFiltered = reunioesForPeriod;
 
     const zohoForPeriod = filterByPeriod(state.zohoRows);
 
-    // Reuniões e assinaturas: relatório Zoho como fonte de verdade
-    // Leads META: contagem de todos os deals com origem META no período (denominador para taxas)
     const { reunioes, assinaturas, discarded } = computeReunioesReport(reunioesForPeriod);
     const { metaTotal } = computeZohoMetaMetrics(zohoForPeriod);
 
@@ -2959,13 +2986,16 @@ function applyLmFilter() {
     return d.horaCriacao >= dateRange.start && d.horaCriacao <= dateRange.end;
   });
 
-  // Re-filtra Zoho pelo período selecionado
-  state.reunioesFiltered = filterByPeriod(state.reunioesRows);
-  const zohoFiltered     = filterByPeriod(state.zohoRows);
+  // Re-filtra Zoho pelo período selecionado.
+  // Relatório oficial já vem filtrado pelo servidor — não refiltra por horaCriacao.
+  state.reunioesFiltered = state.isOfficialReunioesData
+    ? state.reunioesRows
+    : filterByPeriod(state.reunioesRows);
+  const zohoFiltered = filterByPeriod(state.zohoRows);
 
   // Recalcula cards
   const { reunioes, assinaturas } = computeReunioesReport(state.reunioesFiltered);
-  const { metaTotal }             = computeZohoMetaMetrics(zohoFiltered);
+  const { metaTotal } = computeZohoMetaMetrics(zohoFiltered);
   renderLiveMetaMetrics({ metaTotal, reunioes, assinaturas });
 
   // Atualiza período do gráfico e re-renderiza
