@@ -186,8 +186,17 @@ async function getDeals({ forceRefresh = false } = {}) {
   return all;
 }
 
+const reportCache    = new Map(); // reportId → { data, time }
+const REPORT_CACHE_TTL = 5 * 60 * 1000;
+
 // Busca um relatório do Zoho Analytics (Reports) pelo ID, com paginação automática.
-async function getReport(reportId) {
+async function getReport(reportId, { forceRefresh = false } = {}) {
+  const cached = reportCache.get(reportId);
+  if (!forceRefresh && cached && Date.now() - cached.time < REPORT_CACHE_TTL) {
+    console.log(`[Zoho Report] Cache hit (${Math.round((Date.now() - cached.time)/1000)}s atrás)`);
+    return cached.data;
+  }
+
   const token = await getAccessToken();
   const all   = [];
   let page    = 1;
@@ -200,6 +209,8 @@ async function getReport(reportId) {
     page++;
   }
 
+  reportCache.set(reportId, { data: all, time: Date.now() });
+  console.log(`[Zoho Report] ${all.length} registros cacheados`);
   return all;
 }
 
