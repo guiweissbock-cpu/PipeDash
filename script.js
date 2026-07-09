@@ -3126,7 +3126,7 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
   }
 
   // ── Cards de resumo ───────────────────────────────────────────────────────────
-  function renderCards(s) {
+  function renderTransferCards(s) {
     const set = (id, val) => { const el = $(id); if (el) el.textContent = val ?? "—"; };
     set("trfValHoje",   s.hoje    ?? 0);
     set("trfValSemana", s.semana  ?? 0);
@@ -3266,7 +3266,7 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
       const res  = await fetch("/api/transferencia/stats");
       const json = await res.json();
       if (!json.ok) return;
-      renderCards(json.data);
+      renderTransferCards(json.data);
       _trfPorDia = json.data.porDia || {};
       renderChart(_trfPorDia);
     } catch (_) {}
