@@ -5,7 +5,10 @@
  */
 
 // Windows: Node.js não usa o CA store do sistema — bypass necessário localmente.
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+// Em produção (Vercel) as APIs usam certificados válidos; o bypass não deve ser global.
+if (process.env.NODE_ENV !== "production") {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
 
 require("dotenv").config();
 
