@@ -1875,7 +1875,6 @@ async function fetchAllData() {
       const mqlCount  = slackMql.data.length;
       const mqlSim    = slackMql.data.filter(l => l.isMql).length;
       console.log(`[Slack MQL] ${mqlCount} leads carregados · ${mqlSim} com ✅ MQL`);
-      console.table(slackMql.data.slice(0, 5).map(l => ({ nome: l.nome, fonte: l.fonte, isMql: l.isMql })));
     } else {
       console.warn("[Slack MQL] Falha ao carregar:", slackMql.error || "resposta inválida");
     }
