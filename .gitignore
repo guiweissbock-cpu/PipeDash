@@ -4,6 +4,7 @@
 .env.*.local
 .env.production
 .env.staging
+.env.vercel
 credentials/
 
 # Cache com dados sensíveis (leads do Slack)
