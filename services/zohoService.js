@@ -58,14 +58,6 @@ function httpsGet(hostname, path, headers) {
 async function getAccessToken() {
   if (cachedToken && Date.now() < tokenExpiresAt - 60_000) return cachedToken;
 
-  // DEBUG TEMP — remover após diagnosticar invalid_client em produção.
-  console.log("[zoho-debug] client_id len:", (process.env.ZOHO_CLIENT_ID || "").length,
-    "tail:", (process.env.ZOHO_CLIENT_ID || "").slice(-6));
-  console.log("[zoho-debug] client_secret len:", (process.env.ZOHO_CLIENT_SECRET || "").length,
-    "tail:", (process.env.ZOHO_CLIENT_SECRET || "").slice(-4));
-  console.log("[zoho-debug] refresh_token len:", (process.env.ZOHO_REFRESH_TOKEN || "").length,
-    "tail:", (process.env.ZOHO_REFRESH_TOKEN || "").slice(-6));
-
   const body = new URLSearchParams({
     refresh_token: process.env.ZOHO_REFRESH_TOKEN,
     client_id:     process.env.ZOHO_CLIENT_ID,

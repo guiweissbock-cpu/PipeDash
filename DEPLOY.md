@@ -1,7 +1,7 @@
 # Fluxo de Deploy — PipeDash
 
-Repositório: https://github.com/jpofrancisco2/pipedash.git  
-Produção:    https://pipedash.vercel.app  
+Repositório: https://github.com/guiweissbock-cpu/PipeDash.git  
+Produção:    https://pipe-dash.vercel.app  
 Projeto local: `C:\Users\jpofr\OneDrive\Documentos\Nativo\Report-Meta`
 
 ---
@@ -106,9 +106,9 @@ git push origin main
 ### 7. Deploy automático
 
 A Vercel detecta o push no GitHub e inicia o deploy automaticamente.  
-Acompanhar em: https://vercel.com/dashboard → projeto `pipedash`
+Acompanhar em: https://vercel.com/dashboard → projeto `pipe-dash`
 
-Aguardar 1-2 minutos e testar em produção: https://pipedash.vercel.app
+Aguardar 1-2 minutos e testar em produção: https://pipe-dash.vercel.app
 
 ---
 
@@ -132,7 +132,7 @@ Todos estão no `.gitignore`. Verificar com `git status` antes de qualquer commi
 
 As variáveis do `.env` local devem ser configuradas manualmente na Vercel:
 
-**Vercel Dashboard → pipedash → Settings → Environment Variables**
+**Vercel Dashboard → pipe-dash → Settings → Environment Variables**
 
 | Variável                    | Descrição                     |
 |-----------------------------|-------------------------------|
@@ -167,9 +167,9 @@ Aprovação do usuário
      ↓
 git add + git commit + git push origin main
      ↓
-GitHub (jpofrancisco2/pipedash)
+GitHub (guiweissbock-cpu/PipeDash)
      ↓
 Vercel (deploy automático)
      ↓
-https://pipedash.vercel.app (produção)
+https://pipe-dash.vercel.app (produção)
 ```
