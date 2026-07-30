@@ -2848,8 +2848,9 @@ async function fetchLiveMeta() {
 
     status.textContent = "Buscando Meta Ads e Zoho CRM...";
 
-    const [metaRes, zohoRes, dailyRes, mqlRes, reunioesRes] = await Promise.all([
+    const [metaRes, metaInsRes, zohoRes, dailyRes, mqlRes, reunioesRes] = await Promise.all([
       fetch(`/api/meta/live?${params}`).then((r) => r.json()),
+      fetch(`/api/meta/insights?${params}`).then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/zoho/deals").then((r) => r.json()).catch(() => ({ ok: false })),
       fetch(`/api/meta/live/daily?${params}`).then((r) => r.json()).catch(() => ({ ok: false })),
       fetch("/api/slack/mql").then((r) => r.json()).catch(() => ({ ok: false, data: [] })),
@@ -2857,6 +2858,12 @@ async function fetchLiveMeta() {
     ]);
 
     if (!metaRes.ok) throw new Error(metaRes.error || "Erro desconhecido");
+
+    // Alimenta o mesmo pipeline (state.creatives/state.filtered) usado pela Visão Geral,
+    // igual ao botão "Buscar via API" — sem isso a Visão Geral não reflete este refresh.
+    if (metaInsRes.ok && Array.isArray(metaInsRes.data) && metaInsRes.data.length > 0) {
+      state.metaRows = metaApiToRows(metaInsRes.data);
+    }
 
     if (zohoRes.ok && Array.isArray(zohoRes.data)) {
       const rows = zohoApiToRows(zohoRes.data);
@@ -2887,6 +2894,14 @@ async function fetchLiveMeta() {
       });
       state.isOfficialReunioesData = true;
       console.log(`[Live Meta] Relatório oficial de reuniões: ${state.reunioesRows.length} registro(s)`);
+    }
+
+    // Cruzamento Meta × Zoho → criativos (mesmo pipeline usado pela Visão Geral)
+    if (state.metaRows.length > 0) {
+      const { creatives } = buildCreatives(state.metaRows, state.zohoRows);
+      state.creatives    = creatives;
+      state.filtered     = creatives;
+      populateFilterOptions(creatives);
     }
 
     // Filtra pelo período selecionado
@@ -2935,6 +2950,7 @@ async function fetchLiveMeta() {
     renderLiveMeta(metaRes.data || []);
     renderLmDailyToggles();
     renderLmDailyChart();
+    renderOverview();
 
     const now      = new Date().toLocaleString("pt-BR");
     const adCount  = (metaRes.data || []).length;

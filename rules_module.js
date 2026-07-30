@@ -15,8 +15,8 @@
      METADADOS
   ------------------------------------------------------------------------- */
   const RULES_META = {
-    version:   "1.0.0",
-    updatedAt: "2026-07-09",
+    version:   "1.0.1",
+    updatedAt: "2026-07-29",
     authors:   "PipeLovers Engineering"
   };
 
@@ -670,6 +670,27 @@
       exibicao:     "Card em Visão Geral.",
       dependencias: "GERAL-01 à GERAL-08",
       observacoes:  "Equivalente a DASH-08 — mesma função, mesma fonte."
+    },
+
+    {
+      id: "OV-03",
+      name: "Tabela Comparativa Meta × Google (Visão Geral)",
+      module: "Visão Geral",
+      moduleId: "overview",
+      type: "regra-exibicao",
+      fonte:        "state.creatives/state.filtered (Meta) · gadsState (Google Ads)",
+      endpoint:     "renderOverview() em script.js",
+      campo:        "valorGasto, impressoes, cliques, leadsMeta, reunioes, assinaturas (Meta) · gadsState.summary/reunioes/assinaturas (Google)",
+      calculo:      "metaLoaded = state.creatives.length > 0. Coluna Meta soma campos de state.filtered; coluna Google lê gadsState diretamente. Se metaLoaded=false, colunas Meta exibem '—'.",
+      filtroData:   "Período global (state.filtered já filtrado) para Meta; período próprio de gadsState para Google.",
+      inclusao:     "Qualquer criativo presente em state.filtered no momento do render.",
+      exclusao:     "Não se aplica — apenas soma o que já está em state.filtered.",
+      dedup:        "Não se aplica nesta camada — dedup ocorre antes, na montagem de state.creatives (DASH-*).",
+      atribuicao:   "Não se aplica.",
+      agrupamento:  "Totais Meta, Google e combinado (Meta+Google) por métrica.",
+      exibicao:     "Cards executivos e tabela comparativa da aba Visão Geral.",
+      dependencias: "fetchAllData (botão 'Buscar via API') · fetchGoogleAds (aba Google Ads) · fetchLiveMeta (aba Live Meta) · buildCreatives · renderOverview",
+      observacoes:  "BUG CORRIGIDO (2026-07-29): fetchLiveMeta() (botão 'Atualizar Dados' da aba Live Meta) atualizava apenas o próprio painel Live Meta e nunca chamava renderOverview() nem populava state.creatives/state.filtered — resultado: atualizar só a aba Live Meta deixava a Visão Geral com as colunas de Meta em '—', mesmo com dados novos. Corrigido fazendo fetchLiveMeta() também buscar /api/meta/insights, montar state.creatives via buildCreatives() e chamar renderOverview() ao final, no mesmo padrão já usado por fetchGoogleAds()."
     },
 
     // =====================================================================
